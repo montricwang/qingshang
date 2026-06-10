@@ -19,5 +19,5 @@ async def explain(request: PoetryExplainRequest):
 
     except Exception as exc:
         raise HTTPException(
-            status_code=502, detail="Poetry explanation failed"
+            status_code=502, detail=f"{type(exc).__name__}: {str(exc)}"
         ) from exc

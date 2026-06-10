@@ -21,21 +21,26 @@ class DeepSeekChatResponse(BaseModel):
 
 async def chat_completion(
     messages: list[dict[str, str]],
-    model: str = "deepseek-chat",
-    temperature: float = 0.7,
+    model: str | None = None,
+    temperature: float | None = None,
 ):
     if not settings.deepseek_api_key:
         raise RuntimeError("DEEPSEEK_API_KEY is not configured")
+
     headers = {
         "Authorization": f"Bearer {settings.deepseek_api_key}",
         "Content-Type": "application/json",
     }
+
     payload = {
-        "model": model,
+        "model": model or settings.llm_model,
         "messages": messages,
-        "temperature": temperature,
+        "temperature": temperature
+        if temperature is not None
+        else settings.llm_temperature,
     }
-    async with httpx.AsyncClient(timeout=60.0) as client:
+
+    async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
         response = await client.post(
             DEEPSEEK_API_URL,
             headers=headers,
