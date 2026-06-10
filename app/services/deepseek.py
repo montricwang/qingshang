@@ -19,21 +19,21 @@ class DeepSeekChatResponse(BaseModel):
     choices: list[DeepSeekChoice]
 
 
-async def chat_with_deepseek(message: str) -> str:
+async def chat_completion(
+    messages: list[dict[str, str]],
+    model: str = "deepseek-chat",
+    temperature: float = 0.7,
+):
     if not settings.deepseek_api_key:
-        raise ValueError("DeepSeek API key is not set")
-
+        raise RuntimeError("DEEPSEEK_API_KEY is not configured")
     headers = {
         "Authorization": f"Bearer {settings.deepseek_api_key}",
         "Content-Type": "application/json",
     }
     payload = {
-        "model": "deepseek-chat",
-        "messages": [
-            {"role": "system", "content": "你是清商项目中的宋词助手。"},
-            {"role": "user", "content": message},
-        ],
-        "temperature": 0.7,
+        "model": model,
+        "messages": messages,
+        "temperature": temperature,
     }
     async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.post(
@@ -46,6 +46,15 @@ async def chat_with_deepseek(message: str) -> str:
     data = DeepSeekChatResponse.model_validate(response.json())
 
     if not data.choices:
-        raise RuntimeError("DeepSeek response has no choices")
+        raise RuntimeError("Deepseek response has no choices")
 
     return data.choices[0].message.content
+
+
+async def chat_with_deepseek(message: str) -> str:
+    return await chat_completion(
+        messages=[
+            {"role": "system", "content": "你是清商项目中的宋词助手。"},
+            {"role": "user", "content": message},
+        ]
+    )
