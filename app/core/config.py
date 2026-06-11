@@ -18,5 +18,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    database_url: str = (
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/qingshang"
+    )
+
 
 settings = Settings()
