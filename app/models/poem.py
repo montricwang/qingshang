@@ -9,6 +9,15 @@ from app.db.base import Base
 class PoemModel(Base):
     __tablename__: str = "poems"
 
+    __table_args__: tuple[UniqueConstraint, Index] = (
+        UniqueConstraint(
+            "author",
+            "author_order",
+            name="uq_poems_author_author_order",
+        ),
+        Index("ix_poems_author_author_order", "author", "author_order"),
+    )
+
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
     poem_id: Mapped[str] = mapped_column(
@@ -16,7 +25,12 @@ class PoemModel(Base):
         unique=True,
         index=True,
         nullable=False,
-        comment="系统内稳定 ID，例如 li-bai-pusaman-zhonglugong-001",
+        comment="系统内稳定 ID，例如 libai-0001、sushi-0001、zhoubangyan-0001",
+    )
+
+    author_order: Mapped[int] = mapped_column(
+        nullable=False,
+        comment="在该作者词作中的排列顺序",
     )
 
     author: Mapped[str] = mapped_column(
@@ -36,12 +50,12 @@ class PoemModel(Base):
         String(100),
         index=True,
         nullable=False,
-        comment="词牌名，例如菩萨蛮；失调名可写作'失调名'",
+        comment="词牌名，例如菩萨蛮；失调名可写作「失调名」",
     )
     musical_mode: Mapped[str | None] = mapped_column(
         String(100),
         nullable=True,
-        comment="宫调，例如中吕宫、大石调",
+        comment="宫调，例如中吕宫、大石、商调",
     )
 
     title: Mapped[str | None] = mapped_column(
@@ -50,14 +64,10 @@ class PoemModel(Base):
         nullable=True,
         comment="题名，例如赤壁怀古；无题则为空",
     )
-    source_label: Mapped[str | None] = mapped_column(
+    series_label: Mapped[str | None] = mapped_column(
         String(100),
         nullable=True,
-        comment="原文中用于标记篇章关系的标签，例如其一、其二、又、十之一",
-    )
-    source_order: Mapped[int | None] = mapped_column(
-        nullable=True,
-        comment="在当前来源中的排列序号",
+        comment="套词标签，例如其一、其二、第二、十之一；非套词为空；「又」不保存",
     )
 
     preface: Mapped[str | None] = mapped_column(
@@ -69,7 +79,7 @@ class PoemModel(Base):
     full_text: Mapped[str] = mapped_column(
         Text,
         nullable=False,
-        comment="完整正文",
+        comment="完整正文，不含题序；由 sections/lines 自动拼接生成，用于展示、搜索和 AI 上下文",
     )
 
     source: Mapped[str | None] = mapped_column(
@@ -110,7 +120,7 @@ class PoemSectionModel(Base):
     section_name: Mapped[str | None] = mapped_column(
         String(50),
         nullable=True,
-        comment="单调 / 上片 / 下片 / 一叠 / 二叠 / 三叠 / 四叠",
+        comment="片段名称。双调可为上片 / 下片；多叠可为第一叠 / 第二叠 / 第三叠 / 第四叠；单片可为空",
     )
 
     poem: Mapped[PoemModel] = relationship(back_populates="sections")
@@ -124,18 +134,27 @@ class PoemSectionModel(Base):
 class PoemLineModel(Base):
     __tablename__: str = "poem_lines"
 
-    __table_args__: tuple[UniqueConstraint, UniqueConstraint, Index] = (
+    __table_args__: tuple[UniqueConstraint, UniqueConstraint, Index, Index] = (
         UniqueConstraint(
             "poem_db_id",
-            "line_id",
-            name="uq_poem_lines_poem_db_id_line_id",
+            "global_line_no",
+            name="uq_poem_lines_poem_db_id_global_line_no",
         ),
         UniqueConstraint(
-            "poem_db_id",
-            "line_no",
-            name="uq_poem_lines_poem_db_id_line_no",
+            "section_db_id",
+            "section_line_no",
+            name="uq_poem_lines_section_db_id_section_line_no",
         ),
-        Index("ix_poem_lines_poem_db_id_line_no", "poem_db_id", "line_no"),
+        Index(
+            "ix_poem_lines_poem_db_id_global_line_no",
+            "poem_db_id",
+            "global_line_no",
+        ),
+        Index(
+            "ix_poem_lines_section_db_id_section_line_no",
+            "section_db_id",
+            "section_line_no",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -151,14 +170,13 @@ class PoemLineModel(Base):
         nullable=False,
     )
 
-    line_id: Mapped[str] = mapped_column(
-        String(30),
+    global_line_no: Mapped[int] = mapped_column(
         nullable=False,
-        comment="句子 ID，例如 L001",
+        comment="全词内句子序号，用于稳定定位、排序和缓存",
     )
-    line_no: Mapped[int] = mapped_column(
+    section_line_no: Mapped[int] = mapped_column(
         nullable=False,
-        comment="全词内句子序号",
+        comment="当前片段内句子序号，例如上片第 1 句、下片第 2 句",
     )
     text: Mapped[str] = mapped_column(
         Text,

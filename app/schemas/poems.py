@@ -2,14 +2,15 @@ from pydantic import BaseModel, Field
 
 
 class PoemLine(BaseModel):
-    line_id: str = Field(
-        ...,
-        description="句子 ID，例如 L001",
-    )
-    line_no: int = Field(
+    global_line_no: int = Field(
         ...,
         ge=1,
-        description="全词内句子序号",
+        description="全词内句子序号，用于稳定定位、排序和缓存",
+    )
+    section_line_no: int = Field(
+        ...,
+        ge=1,
+        description="当前片段内句子序号，例如上片第 1 句、下片第 2 句",
     )
     text: str = Field(
         ...,
@@ -34,7 +35,7 @@ class PoemSection(BaseModel):
 class PoemCore(BaseModel):
     poem_id: str = Field(
         ...,
-        description="系统内唯一 ID",
+        description="系统内唯一 ID，形如 libai-0001",
     )
 
     author_order: int = Field(
