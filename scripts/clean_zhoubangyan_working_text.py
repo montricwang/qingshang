@@ -618,16 +618,16 @@ def write_review(
 
         lines.append(
             f"- {item['poem_id']} | "
-            f"序号={item.get('author_order')} | "
-            f"词牌={item.get('tune_name')} | "
-            f"宫调={item.get('musical_mode')} | "
-            f"题名={item.get('title')} | "
-            f"套词={item.get('series_label')} | "
-            f"片数={item.get('section_count')} | "
-            f"解释单位数={item.get('line_count')}"
+            + f"序号={item.get('author_order')} | "
+            + f"词牌={item.get('tune_name')} | "
+            + f"宫调={item.get('musical_mode')} | "
+            + f"题名={item.get('title')} | "
+            + f"套词={item.get('series_label')} | "
+            + f"片数={item.get('section_count')} | "
+            + f"解释单位数={item.get('line_count')}"
         )
 
-    OUTPUT_REVIEW_PATH.write_text("\n".join(lines), encoding="utf-8")
+    _ = OUTPUT_REVIEW_PATH.write_text("\n".join(lines), encoding="utf-8")
 
 
 def main() -> None:
@@ -645,7 +645,7 @@ def main() -> None:
     OUTPUT_JSON_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_REVIEW_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    OUTPUT_JSON_PATH.write_text(
+    _ = OUTPUT_JSON_PATH.write_text(
         json.dumps(validated_poems, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
