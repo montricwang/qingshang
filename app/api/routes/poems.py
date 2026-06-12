@@ -1,0 +1,50 @@
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.crud.poem import (
+    get_poem_by_poem_id,
+    list_poems,
+    poem_to_detail,
+    poem_to_list_item,
+)
+from app.db.session import get_db
+
+router = APIRouter(
+    prefix="/api/poems",
+    tags=["poems"],
+)
+
+
+@router.get("")
+async def read_poem_list(
+    author: str | None = Query(default=None, description="作者，例如：周邦彦"),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+):
+    poems = await list_poems(
+        db=db,
+        author=author,
+        limit=limit,
+        offset=offset,
+    )
+
+    return [poem_to_list_item(poem) for poem in poems]
+
+
+@router.get("/{poem_id}")
+async def read_poem_detail(
+    poem_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    poem = await get_poem_by_poem_id(db=db, poem_id=poem_id)
+
+    if poem is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"找不到词作：{poem_id}",
+        )
+
+    return poem_to_detail(poem)
