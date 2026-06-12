@@ -9,7 +9,7 @@ class PoemLine(BaseModel):
     line_no: int = Field(
         ...,
         ge=1,
-        description="全词内句子序号,",
+        description="全词内句子序号",
     )
     text: str = Field(
         ...,
@@ -26,7 +26,7 @@ class PoemSection(BaseModel):
     )
     section_name: str | None = Field(
         default=None,
-        description="单调 / 上片 / 下片 / 一叠 / 二叠 / 三叠 / 四叠",
+        description="片段名称。双调可为上片 / 下片；多叠可为第一叠 / 第二叠 / 第三叠 / 第四叠；单片可为空",
     )
     lines: list[PoemLine]
 
@@ -35,6 +35,12 @@ class PoemCore(BaseModel):
     poem_id: str = Field(
         ...,
         description="系统内唯一 ID",
+    )
+
+    author_order: int = Field(
+        ...,
+        ge=1,
+        description="在该作者词作中的排列顺序",
     )
 
     author: str = Field(
@@ -59,15 +65,10 @@ class PoemCore(BaseModel):
         default=None,
         description="题名，例如赤壁怀古；无题则为空",
     )
-    source_label: str | None = Field(
-        default=None,
-        description="原文中用于标记篇章关系的标签，例如其一、其二、又、十之一",
-    )
 
-    source_order: int | None = Field(
+    series_label: str | None = Field(
         default=None,
-        ge=1,
-        description="在当前来源中的排列序号",
+        description="套词标签，例如其一、其二、第二、十之一；非套词为空",
     )
 
     preface: str | None = Field(
