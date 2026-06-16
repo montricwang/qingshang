@@ -9,6 +9,8 @@ from app.crud.poem import (
     poem_to_detail,
     poem_to_list_item,
 )
+from app.services.poem_analyzer import analyze_poem
+
 from app.db.session import get_db
 
 router = APIRouter(
@@ -48,3 +50,27 @@ async def read_poem_detail(
         )
 
     return poem_to_detail(poem)
+
+
+@router.post("/{poem_id}/analyze")
+async def analyze_poem_detail(
+    poem_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    poem = await get_poem_by_poem_id(db=db, poem_id=poem_id)
+
+    if poem is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"找不到词作：{poem_id}",
+        )
+
+    try:
+        analysis = await analyze_poem(poem)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"分析失败：{exc}",
+        ) from exc
+
+    return analysis.model_dump(mode="json")
