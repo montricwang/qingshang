@@ -3,8 +3,6 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 
-DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions"
-
 
 class DeepSeekMessage(BaseModel):
     role: str
@@ -24,11 +22,13 @@ async def chat_completion(
     model: str | None = None,
     temperature: float | None = None,
 ):
-    if not settings.deepseek_api_key:
-        raise RuntimeError("DEEPSEEK_API_KEY is not configured")
+    if not settings.llm_api_key:
+        raise RuntimeError("LLM_API_KEY is not configured")
+
+    url = f"{settings.llm_base_url.rstrip('/')}/v1/chat/completions"
 
     headers = {
-        "Authorization": f"Bearer {settings.deepseek_api_key}",
+        "Authorization": f"Bearer {settings.llm_api_key}",
         "Content-Type": "application/json",
     }
 
@@ -42,7 +42,7 @@ async def chat_completion(
 
     async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
         response = await client.post(
-            DEEPSEEK_API_URL,
+            url,
             headers=headers,
             json=payload,
         )
