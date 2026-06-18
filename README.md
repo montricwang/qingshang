@@ -64,16 +64,16 @@ FastAPI 的依赖注入系统执行。
 `BaseModel` 子类是一份运行时数据契约。例如：
 
 ```python
-class PoetryExplainRequest(BaseModel):
-    text: str = Field(..., min_length=1)
+class PoemLine(BaseModel):
+    global_line_no: int = Field(..., ge=1)
 ```
 
-它不仅是类型提示。FastAPI 收到 JSON 后会要求 Pydantic：
+它不仅是类型提示。程序校验一条词句时，Pydantic 会：
 
-1. 把 JSON 转成 Python 数据；
-2. 检查 `text` 是否存在、是否是字符串、长度是否至少为 1；
-3. 成功后创建 `PoetryExplainRequest` 对象；
-4. 失败时生成结构化错误，由 FastAPI 返回 HTTP 422。
+1. 从字典或 ORM 对象读取字段；
+2. 检查 `global_line_no` 是否存在、是否为整数、是否至少为 1；
+3. 成功后创建 `PoemLine` 对象；
+4. 失败时生成结构化校验错误。
 
 `ConfigDict(from_attributes=True)` 表示除了字典，Pydantic 也可以从 ORM 对象的同名
 属性读取数据。
