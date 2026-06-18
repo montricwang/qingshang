@@ -1,4 +1,4 @@
-from app.services.deepseek import chat_completion
+from app.services.llm_client import chat_completion
 
 
 async def explain_poetry(text: str, focus: str | None = None) -> str:

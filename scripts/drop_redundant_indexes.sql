@@ -1,0 +1,3 @@
+DROP INDEX IF EXISTS ix_poems_author_author_order;
+DROP INDEX IF EXISTS ix_poem_lines_poem_db_id_global_line_no;
+DROP INDEX IF EXISTS ix_poem_lines_section_db_id_section_line_no;

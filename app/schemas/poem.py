@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PoemLine(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     global_line_no: int = Field(
         ...,
         ge=1,
@@ -20,6 +22,8 @@ class PoemLine(BaseModel):
 
 
 class PoemSection(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     section_no: int = Field(
         ...,
         ge=1,
@@ -32,7 +36,9 @@ class PoemSection(BaseModel):
     lines: list[PoemLine]
 
 
-class PoemCore(BaseModel):
+class PoemListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     poem_id: str = Field(
         ...,
         description="系统内唯一 ID，形如 libai-0001",
@@ -72,6 +78,8 @@ class PoemCore(BaseModel):
         description="套词标签，例如其一、其二、第二、十之一；非套词为空",
     )
 
+
+class PoemCore(PoemListItem):
     preface: str | None = Field(
         default=None,
         description="题序 / 小序",

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -9,13 +9,12 @@ from app.db.base import Base
 class PoemModel(Base):
     __tablename__: str = "poems"
 
-    __table_args__: tuple[UniqueConstraint, Index] = (
+    __table_args__ = (
         UniqueConstraint(
             "author",
             "author_order",
             name="uq_poems_author_author_order",
         ),
-        Index("ix_poems_author_author_order", "author", "author_order"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -91,13 +90,14 @@ class PoemModel(Base):
     sections: Mapped[list[PoemSectionModel]] = relationship(
         back_populates="poem",
         cascade="all, delete-orphan",
+        order_by="PoemSectionModel.section_no",
     )
 
 
 class PoemSectionModel(Base):
     __tablename__: str = "poem_sections"
 
-    __table_args__: tuple[UniqueConstraint] = (
+    __table_args__ = (
         UniqueConstraint(
             "poem_db_id",
             "section_no",
@@ -128,13 +128,14 @@ class PoemSectionModel(Base):
     lines: Mapped[list[PoemLineModel]] = relationship(
         back_populates="section",
         cascade="all, delete-orphan",
+        order_by="PoemLineModel.section_line_no",
     )
 
 
 class PoemLineModel(Base):
     __tablename__: str = "poem_lines"
 
-    __table_args__: tuple[UniqueConstraint, UniqueConstraint, Index, Index] = (
+    __table_args__ = (
         UniqueConstraint(
             "poem_db_id",
             "global_line_no",
@@ -144,16 +145,6 @@ class PoemLineModel(Base):
             "section_db_id",
             "section_line_no",
             name="uq_poem_lines_section_db_id_section_line_no",
-        ),
-        Index(
-            "ix_poem_lines_poem_db_id_global_line_no",
-            "poem_db_id",
-            "global_line_no",
-        ),
-        Index(
-            "ix_poem_lines_section_db_id_section_line_no",
-            "section_db_id",
-            "section_line_no",
         ),
     )
 
