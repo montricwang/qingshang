@@ -1,5 +1,7 @@
-from types import SimpleNamespace
-from unittest import TestCase
+"""不访问真实数据库和 LLM 的核心回归测试。"""
+
+from types import SimpleNamespace  # 快速创建只有属性的假 ORM 对象。
+from unittest import TestCase  # Python 标准库提供的测试基类。
 
 from app.main import app
 from app.schemas.poem import PoemCore
@@ -8,6 +10,8 @@ from scripts.clean_zhoubangyan_working_text import parse_meta_line, split_lines
 
 
 class PoemSchemaTests(TestCase):
+    """验证 Pydantic 能否读取嵌套 ORM 风格对象。"""
+
     def test_poem_core_validates_nested_orm_objects(self) -> None:
         poem = SimpleNamespace(
             poem_id="test-0001",
@@ -48,12 +52,17 @@ class PoemSchemaTests(TestCase):
 
 
 class AnalyzerTests(TestCase):
+    """验证 LLM 输出清理工具。"""
+
     def test_extract_json_removes_markdown_fence(self) -> None:
         self.assertEqual(extract_json('```json\n{"ok": true}\n```'), '{"ok": true}')
 
 
 class RouteTests(TestCase):
+    """通过 FastAPI 自动生成的 OpenAPI 文档检查路由注册结果。"""
+
     def test_openapi_contains_only_supported_api_routes(self) -> None:
+        # app.openapi() 会遍历已注册路由，生成接口描述字典。
         paths = app.openapi()["paths"]
 
         self.assertIn("/api/poems", paths)
@@ -62,6 +71,8 @@ class RouteTests(TestCase):
 
 
 class CleanerTests(TestCase):
+    """验证离线文本清洗器的关键规则。"""
+
     def test_parse_meta_line_extracts_mode_and_title(self) -> None:
         result = parse_meta_line("大石秋怨")
 

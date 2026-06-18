@@ -1,7 +1,9 @@
+"""把数据库中的完整诗词转换成结构化 LLM 赏析。"""
+
 from __future__ import annotations
 
-import json
-import re
+import json  # 在 LLM 文本与 Python 字典之间转换 JSON。
+import re  # 用正则表达式提取 Markdown 代码围栏中的 JSON。
 
 from app.models.poem import PoemModel
 from app.schemas.analysis import PoemAnalysis
@@ -9,10 +11,13 @@ from app.services.llm_client import chat_completion
 
 
 def build_poem_text_for_prompt(poem: PoemModel) -> str:
+    """把 ORM 中分层保存的片段和词句整理成带编号的提示词文本。"""
+    # 即使数据库返回顺序改变，也先显式排序，保证提示词编号稳定。
     sections = sorted(poem.sections, key=lambda section: section.section_no)
 
     blocks: list[str] = []
 
+    # 逐片构建文本块，每一行保留全词编号和片内编号。
     for section in sections:
         section_name = section.section_name or "正文"
         lines = sorted(section.lines, key=lambda line: line.global_line_no)
@@ -32,9 +37,7 @@ def build_poem_text_for_prompt(poem: PoemModel) -> str:
 
 
 def extract_json(text: str) -> str:
-    """
-    兼容模型返回 ```json ... ``` 的情况。
-    """
+    """提取 LLM 文本中的 JSON，兼容模型擅自添加 Markdown 代码围栏的情况。"""
     text = text.strip()
 
     fenced = re.search(r"```(?:json)?\s*(.*?)```", text, re.S)
@@ -45,6 +48,8 @@ def extract_json(text: str) -> str:
 
 
 def build_analysis_prompt(poem: PoemModel) -> list[dict[str, str]]:
+    """根据一首词生成 Chat Completions 所需的 system/user 消息列表。"""
+    # 第一阶段：把数据库对象转成模型容易准确引用的编号文本和标题。
     poem_text = build_poem_text_for_prompt(poem)
 
     title_part = f"《{poem.tune_name}"
@@ -54,6 +59,7 @@ def build_analysis_prompt(poem: PoemModel) -> list[dict[str, str]]:
 
     preface_part = poem.preface or "无"
 
+    # system_prompt 定义稳定规则；user_prompt 包含本次诗词和 JSON 输出格式。
     system_prompt = (
         "你是一名宋词赏析助手。"
         "你的任务是基于给定原文做解释，不要编造作者生平、写作背景或不存在的典故。"
@@ -115,6 +121,12 @@ def build_analysis_prompt(poem: PoemModel) -> list[dict[str, str]]:
 
 
 async def analyze_poem(poem: PoemModel) -> PoemAnalysis:
+    """请求并验证一首词的结构化赏析。
+
+    输入：已经加载 sections 和 lines 的 PoemModel。
+    输出：经过 Pydantic 校验的 PoemAnalysis。
+    """
+    # 第一阶段：构造提示词并等待外部模型返回原始文本。
     messages = build_analysis_prompt(poem)
 
     raw_text = await chat_completion(
@@ -122,6 +134,7 @@ async def analyze_poem(poem: PoemModel) -> PoemAnalysis:
         temperature=0.2,
     )
 
+    # 第二阶段：清理可能出现的 Markdown 包装，再解析为 Python 字典。
     json_text = extract_json(raw_text)
 
     try:
@@ -129,6 +142,7 @@ async def analyze_poem(poem: PoemModel) -> PoemAnalysis:
     except json.JSONDecodeError as exc:
         raise ValueError(f"模型没有返回合法 JSON：{raw_text}") from exc
 
+    # 第三阶段：验证所有必需字段和嵌套结构，拒绝格式不完整的模型回答。
     analysis = PoemAnalysis.model_validate(data)
 
     return analysis

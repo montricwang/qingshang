@@ -1,5 +1,12 @@
+"""周邦彦文本清洗器使用的领域规则数据。
+
+把规则与解析流程分开，新增词牌或宫调时只需修改本文件。导入本模块时，集合、列表
+和正则表达式会创建一次，后续清洗函数重复使用它们。
+"""
+
 import re
 
+# 原始文本中允许被识别为一首新词开头的词牌。
 KNOWN_TUNE_NAMES = {
     "瑞龙吟",
     "锁窗寒",
@@ -120,6 +127,7 @@ KNOWN_TUNE_NAMES = {
     "醉桃源",
 }
 
+# 按文本可能出现的形式列出宫调；解析时会再按长度倒序尝试。
 KNOWN_MODES = [
     "仙吕调",
     "中吕宫",
@@ -143,6 +151,7 @@ KNOWN_MODES = [
     "道宫",
 ]
 
+# 表示同一组套词序号的独立行。
 SERIES_MARKERS = {
     "第一",
     "第二",
@@ -166,7 +175,9 @@ SERIES_MARKERS = {
     "其十",
 }
 
+# 只按这些标点切句，不按顿号和分号切分。
 LINE_SPLIT_PUNCS = "，。！？"
 BODY_PUNCS = set(LINE_SPLIT_PUNCS)
 TERMINAL_PUNCS = set(LINE_SPLIT_PUNCS)
+# compile 预先创建正则对象，用于解析“二首别恨”一类元数据行。
 SERIES_TOTAL_RE = re.compile(r"^([一二三四五六七八九十]+)首(.*)$")
