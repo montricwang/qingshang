@@ -1,6 +1,6 @@
 """定义诗词、片段和词句的 ORM 模型。"""
 
-from __future__ import annotations
+from __future__ import annotations  # 允许类型标注引用后面才声明的模型类。
 
 from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -9,7 +9,7 @@ from app.db.base import Base
 
 
 class PoemModel(Base):
-    """一首词的主记录，对应数据库 ``poems`` 表。"""
+    """一首词的主记录；id 是数据库主键，poem_id 是业务稳定编号。"""
 
     __tablename__: str = "poems"
 
@@ -91,7 +91,7 @@ class PoemModel(Base):
         comment="文本来源",
     )
 
-    # 详情查询使用 selectinload 预加载该关系，避免响应序列化时再发 SQL。
+    # 详情查询需预加载该关系，避免响应序列化时再访问数据库。
     sections: Mapped[list[PoemSectionModel]] = relationship(
         back_populates="poem",
         cascade="all, delete-orphan",
@@ -159,6 +159,7 @@ class PoemLineModel(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
+    # 该直接外键用于约束一首词内的 global_line_no 唯一，不应只经 section 间接关联。
     poem_db_id: Mapped[int] = mapped_column(
         ForeignKey("poems.id", ondelete="CASCADE"),
         index=True,
