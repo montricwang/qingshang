@@ -1,15 +1,8 @@
-"""诗词数据库 ORM 模型。
-
-ORM（对象关系映射）让 Python 对象与数据库记录相互转换。``mapped_column`` 不是
-在此刻存入某个值，而是在类创建阶段向 SQLAlchemy 声明列；查询后，同名属性才会
-装入某一行的真实数据。``relationship`` 声明对象之间的导航关系，不直接新增列。
-"""
+"""定义诗词、片段和词句的 ORM 模型。"""
 
 from __future__ import annotations
 
-# SQLAlchemy 的列类型、外键和数据库约束。
 from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
-# ORM 类型标注、列声明和对象关系声明工具。
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -20,7 +13,6 @@ class PoemModel(Base):
 
     __tablename__: str = "poems"
 
-    # 组合唯一约束保证同一作者不能出现重复的排列序号；数据库负责最终兜底。
     __table_args__ = (
         UniqueConstraint(
             "author",
@@ -29,7 +21,6 @@ class PoemModel(Base):
         ),
     )
 
-    # Mapped[int] 同时服务于类型检查和 SQLAlchemy；mapped_column 描述真实数据库列。
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
     poem_id: Mapped[str] = mapped_column(
@@ -100,8 +91,7 @@ class PoemModel(Base):
         comment="文本来源",
     )
 
-    # relationship 根据外键把一首词的多个片段组织成 Python 列表。
-    # 默认查询主表时它未必立刻加载；本项目详情查询使用 selectinload 主动预加载。
+    # 详情查询使用 selectinload 预加载该关系，避免响应序列化时再发 SQL。
     sections: Mapped[list[PoemSectionModel]] = relationship(
         back_populates="poem",
         cascade="all, delete-orphan",
@@ -124,7 +114,6 @@ class PoemSectionModel(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
-    # 外键在数据库层保证 section 指向一条真实存在的 poem 记录。
     poem_db_id: Mapped[int] = mapped_column(
         ForeignKey("poems.id", ondelete="CASCADE"),
         index=True,
@@ -141,7 +130,6 @@ class PoemSectionModel(Base):
         comment="片段名称。双调可为上片 / 下片；多叠可为第一叠 / 第二叠 / 第三叠 / 第四叠；单片可为空",
     )
 
-    # back_populates 把双向关系配对：section.poem 与 poem.sections 保持一致。
     poem: Mapped[PoemModel] = relationship(back_populates="sections")
 
     lines: Mapped[list[PoemLineModel]] = relationship(
@@ -196,5 +184,4 @@ class PoemLineModel(Base):
         comment="词句正文，保留标点",
     )
 
-    # 从行对象导航回所属片段；真正的关联依据是 section_db_id 外键。
     section: Mapped[PoemSectionModel] = relationship(back_populates="lines")

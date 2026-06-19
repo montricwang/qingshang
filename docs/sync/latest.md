@@ -1,11 +1,11 @@
 # Qingshang 项目现状同步
 
-> 生成日期：2026-06-18  
-> 仓库基线：`main` / `e6fc486`  
-> 当前工作区：已移除旧 `/api/poetry/explain`，本文件包含未提交的新状态  
-> 最近两次提交：  
-> `e6fc486 docs: document framework control flow and core architecture`  
-> `dc2f704 refactor: streamline API, LLM client, and data processing`
+> 生成日期：2026-06-19
+> 仓库基线：`main` / `3a39ab3`
+> 当前工作区：已按 `docs/code-reading/` 规范精简源码注释
+> 最近两次提交：
+> `3a39ab3 refactor: remove legacy poetry explanation endpoint`
+> `e6fc486 docs: document framework control flow and core architecture`
 
 ## 1. 当前代码现状
 
@@ -32,6 +32,16 @@ HTTP 请求
 
 当前只包含后端、数据清洗/导入脚本和少量单元测试，没有前端、用户系统、权限系统、
 Alembic 数据库迁移、Docker 配置或 CI。
+
+### 2026-06-19 注释规范化
+
+- 按 `low-noise-code-reading.md` 与 `python-file-reading.md` 收紧源码注释。
+- 删除基础 import 翻译、重复代码表面含义和“第一阶段/第二阶段”式旁白。
+- 缩短文件、类和函数 docstring，只保留职责与输出边界。
+- 保留 FastAPI 自动注册/注入、ORM 关系预加载、`create_all` 限制、事务提交和清洗状态机等关键说明。
+- 未修改 API、数据库结构、数据契约或业务执行逻辑。
+- `python -m compileall app scripts` 已通过。
+- 现有 5 项 unittest 已通过。
 
 ## 2. 本轮文件变化
 
@@ -96,7 +106,7 @@ Alembic 数据库迁移、Docker 配置或 CI。
 
 - 职责：将 `poems_router` 收口为应用注册的 `api_router`。
 - 主要对象：`api_router`。
-- 连接：被 `app/main.py` 注册；导入两个业务路由模块会触发装饰器注册。
+- 连接：被 `app/main.py` 注册；导入 poems 路由模块会触发装饰器注册。
 
 #### `app/api/routes/poems.py`
 
@@ -344,7 +354,7 @@ psql -d qingshang -f scripts\drop_redundant_indexes.sql
 ### 建议暂时不要动
 
 - **不要直接重构三层诗词表结构。** `poem_id`、section/line 编号、外键和唯一约束已经与现有 JSON 和导入流程绑定；应先建立 Alembic 和集成测试。
-- **不要删除目前新增的解释性注释。** 当前维护者正在理解控制反转、依赖注入和 ORM，注释具有实际维护价值；以后只删除过时或重复表面语义的内容。
+- **保留关键的低噪声注释。** FastAPI 控制反转、ORM 预加载和事务边界仍需在源码附近提示；详细教学应继续放在 `docs/code-reading/`。
 - **不要大改周邦彦解析状态机和规则集合。** 当前只有少量辅助函数测试，缺少完整语料快照测试；看似简单的清理可能改变 500KB 生成 JSON。
 - **不要贸然升级全部依赖。** 当前版本已经固定；应先有集成测试，再分批升级 FastAPI、Pydantic、SQLAlchemy 和 asyncpg。
 - **不要删除 `poem_lines.poem_db_id` 这类看似重复的字段。** 它参与全词句号唯一约束和查询设计，删除需要数据库迁移与性能验证。
@@ -353,7 +363,7 @@ psql -d qingshang -f scripts\drop_redundant_indexes.sql
 ## 8. 下一步建议（按优先级）
 
 1. **补齐可重复运行环境。** 新增 `.env.example`，明确 PostgreSQL 初始化步骤；可选增加 Docker Compose 只启动 PostgreSQL。
-2. **做一次真实端到端冒烟验证。** 建表、清洗、导入，然后依次请求 health、列表、详情、自由赏析和结构化分析；记录命令与结果。
+2. **做一次真实端到端冒烟验证。** 建表、清洗、导入，然后依次请求 health、列表、详情和结构化分析；记录命令与结果。
 3. **引入 Alembic 并建立基线迁移。** 将当前三张表和索引作为首个基线，之后不再用零散 SQL 管理结构变更。
 4. **补 API/数据库集成测试。** 使用测试数据库覆盖依赖注入、分页、404、嵌套详情、级联删除；使用 mock transport 覆盖 LLM 成功与错误响应。
 5. **收紧分析接口契约。** 为 analyze 声明 `response_model=PoemAnalysis`，只捕获预期异常，服务端记录详细错误，客户端返回稳定错误消息。

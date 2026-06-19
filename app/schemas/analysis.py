@@ -24,11 +24,7 @@ class ImageryItem(BaseModel):
 
 
 class PoemAnalysis(BaseModel):
-    """整首词的结构化分析。
-
-    模型返回的 JSON 必须通过本类验证后才能交给 API；缺字段或字段类型错误会触发
-    ValidationError，避免把不可预测的 LLM 原始输出直接返回给客户端。
-    """
+    """经过 Pydantic 校验的整首词结构化分析。"""
 
     poem_id: str
     tune_name: str

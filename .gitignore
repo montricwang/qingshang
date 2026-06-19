@@ -4,3 +4,5 @@ __pycache__/
 .env
 qingshang.db
 data/generated/*_review.md
+AGENTS.md
+docs/

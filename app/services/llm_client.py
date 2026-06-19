@@ -1,12 +1,9 @@
-"""调用兼容 OpenAI Chat Completions 格式的 LLM HTTP 接口。
-
-上层业务只需要传 messages，不关心 URL、认证头、超时和响应 JSON 的具体层级。
-"""
+"""调用兼容 OpenAI Chat Completions 协议的 LLM。"""
 
 from __future__ import annotations
 
-import httpx  # 异步 HTTP 客户端，用于向外部 LLM 服务发送网络请求。
-from pydantic import BaseModel  # 校验服务端返回的 JSON 结构。
+import httpx
+from pydantic import BaseModel
 
 from app.core.config import settings
 
@@ -39,17 +36,10 @@ async def chat_completion(
     model: str | None = None,
     temperature: float | None = None,
 ) -> str:
-    """发送聊天请求并返回第一个候选答案的文本。
-
-    输入：按角色排列的消息列表，以及可选模型名和温度。
-    输出：``choices[0].message.content`` 字符串。
-    异常：配置缺失、HTTP 失败或响应格式不符时抛出 LLMClientError。
-    """
-    # 第一阶段：在网络请求前检查必要配置，尽早给出清晰错误。
+    """发送聊天请求并返回第一个候选文本。"""
     if not settings.llm_api_key:
         raise LLMClientError("缺少 LLM_API_KEY，请在 .env 中配置。")
 
-    # 第二阶段：按照服务端协议组装 URL、JSON 请求体和认证请求头。
     url = f"{settings.llm_base_url.rstrip('/')}/v1/chat/completions"
 
     payload = {
@@ -65,12 +55,9 @@ async def chat_completion(
         "Content-Type": "application/json",
     }
 
-    # AsyncClient 的上下文管理器会在退出时自动释放连接资源。
-    # await 期间当前协程暂停，但事件循环仍可处理其他 HTTP 请求。
     async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
         response = await client.post(url, json=payload, headers=headers)
 
-    # 第三阶段：把 4xx/5xx 状态转换成本项目统一异常。
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
@@ -78,7 +65,7 @@ async def chat_completion(
             f"LLM 请求失败：{response.status_code} {response.text}"
         ) from exc
 
-    # 第四阶段：response.json() 解码 JSON，Pydantic 再检查所需嵌套字段。
+    # 外部响应必须先通过本地结构校验，不能直接交给业务层。
     try:
         data = LLMChatResponse.model_validate(response.json())
     except (ValueError, TypeError) as exc:
@@ -87,5 +74,4 @@ async def chat_completion(
     if not data.choices:
         raise LLMClientError("LLM 返回中没有 choices")
 
-    # 业务层只需要文本，因此隐藏外部 API 的 choices/message 包装结构。
     return data.choices[0].message.content

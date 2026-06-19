@@ -1,14 +1,10 @@
-"""集中组装业务路由。
+"""将业务路由聚合为应用使用的总路由。"""
 
-业务文件维护自己的 ``router``，本模块再将它收口为 ``api_router``。
-应用入口只需注册总路由，新增业务路由时不必继续修改 ``main.py``。
-"""
-
-from fastapi import APIRouter  # 一个可组合的“小型路由表”，本身不是 Web 应用。
+from fastapi import APIRouter
 
 from app.api.routes.poems import router as poems_router
 
-# 以下代码在模块导入时运行，只负责组装路由表，不会执行具体接口函数。
+# 导入时只登记规则，不会执行具体路由函数。
 api_router = APIRouter()
 api_router.include_router(poems_router)
 
