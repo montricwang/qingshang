@@ -1,11 +1,11 @@
 # Qingshang 项目现状同步
 
-> 生成日期：2026-06-19
-> 仓库基线：`main` / `3a39ab3`
-> 当前工作区：已按 `docs/code-reading/` 规范精简源码注释
+> 生成日期：2026-06-20
+> 仓库基线：`main` / `746a682`
+> 当前工作区：新增 CNKGraph 全接口 probe、原始结果和项目适用性报告
 > 最近两次提交：
-> `3a39ab3 refactor: remove legacy poetry explanation endpoint`
-> `e6fc486 docs: document framework control flow and core architecture`
+> `746a682 refactor: update type annotations for table arguments in poem models`
+> `b9b030f refactor: centralize app configurations and enforce fail-fast runtime validation`
 
 ## 1. 当前代码现状
 
@@ -32,6 +32,66 @@ HTTP 请求
 
 当前只包含后端、数据清洗/导入脚本和少量单元测试，没有前端、用户系统、权限系统、
 Alembic 数据库迁移、Docker 配置或 CI。
+
+### 2026-06-20 CNKGraph Tool Layer v0.1
+
+- 新增 `app/services/cnkgraph_client.py`：使用 `httpx.AsyncClient` 封装 11 个近期只读接口，统一处理超时、网络、非 2xx 和 JSON 错误。
+- 新增 `app/services/cnkgraph_tools.py`：把典故、出处、字典、词谱和韵典原始响应适配为清商窄模型。
+- 新增 `app/schemas/cnkgraph.py`：定义 `EvidenceItem`、`AllusionCandidate`、`ProsodyAid`、`ReadingAidRequest/Response` 等本地契约；第三方字段只保存在 `raw`。
+- 新增 `app/api/routes/cnkgraph.py` 并注册到总路由；没有修改原 poems 查询与 analyze 实现。
+- 新增直接工具接口：`GET /api/cnkgraph/char/{char}`、`GET /api/cnkgraph/allusions`、`POST /api/cnkgraph/reference`、`GET /api/cnkgraph/ci-tunes`、`POST /api/cnkgraph/rhyme`。
+- 新增 `POST /api/poems/{poem_id}/reading-aids`：先读取本地词作并校验句号，再按 include 调用外部工具；单个工具失败只写入 `errors`，不让整次阅读请求返回 500。
+- reading-aids 不调用 LLM，不做实体消歧或确定性典故判断；字典与韵典一次最多查询 30 个不重复文字。
+- 配置新增 `CNKGRAPH_BASE_URL` 和 `CNKGRAPH_TIMEOUT_SECONDS`；新增完整 `.env.example`。
+- 新增 `tests/test_cnkgraph_schemas.py` 和 `tests/test_cnkgraph_tools.py`，使用 MockTransport/AsyncMock，不真实访问 CNKGraph。
+- 新增 `docs/cnkgraph/integration_v0_1.md`，记录接口范围、窄模型、raw、失败降级和后续边界。
+- 明确不接两个 labelize 接口，也不接人物、地理、年历、古籍、类书和曲谱。
+- 没有新增 ORM model、数据库迁移或数据库表，没有把 CNKGraph ID 写入 poems/sections/lines。
+- `python -m compileall app scripts tests` 已通过；`python -m pytest -q` 已通过 12 项测试。
+- 本地真实冒烟已通过：`GET /health`、`GET /api/poems?limit=1`、OpenAPI 路由、`GET /api/cnkgraph/allusions?key=前度刘郎` 和 `POST /api/poems/zhoubangyan-0001/reading-aids` 均成功。
+- 真实典故请求返回 1 个清商 `AllusionCandidate`；reading-aids 使用 allusion/reference 返回 200 且 `errors=[]`。
+- 使用不可达上游启动独立测试实例后，reading-aids 仍返回 200，并在 `errors` 中记录超时；直接 allusions 接口按设计返回 502。
+
+### 2026-06-20 CNKGraph 自动笺注专项复测
+
+- 新增 `scripts/probes/probe_cnkgraph_labelize.py`，硬性限制请求间隔至少 0.5 秒、总请求不超过 80 次。
+- 最终实际请求 53 次，其中 31 次为 labelize 调用，0/31 返回 2xx；没有连接错误。
+- 测试覆盖两种 host、常见路径和大小写变体、JSON/form/text 三种载荷、字段别名、四类文本以及 OPTIONS。
+- 使用杜甫、苏轼、周邦彦、李白各 3 首真实作品交叉验证；12 个作品详情全部返回 200，对应 labelize 全部返回 404“作者不存在”。
+- `POST /api/tool/labelize` 在所有变体下均为空 404，没有进入参数校验；没有出现 401、403 或认证提示。
+- `OPTIONS /api/writing/10000/labelize` 返回 405 和 `Allow: GET`，但 `labels`、`annotations` 等同层路径也返回“作者不存在”，说明请求更可能被通用作品/作者路由误匹配，而非 labelize action 可用。
+- 当前最符合证据的结论是公开 labelize 路径已移除、迁移或未暴露；不存在“参数格式错误”或“仅部分作品支持”的正向证据。
+- 原始结果保存到 `data/generated/cnkgraph_labelize_probe_20260620_134704.json`，专项报告保存到 `docs/cnkgraph/labelize_probe_report.md`。
+- 决策保持为“暂缓且不等待”：近期使用 glossary、reference、char、ciTune、tones、rhyme 组合清商自己的候选笺注链路。
+- 本轮未修改 FastAPI 业务代码、数据库结构、poems 接口或数据契约。
+
+### 2026-06-20 CNKGraph 全接口 probe
+
+- 新增 `scripts/probe_cnkgraph_all.py`，直接读取 `docs/cnkgraph/postman/` 中 12 份 Postman collection，共展开 71 个请求。
+- 使用 collection 自带变量和集合级回退参数，按顺序真实访问 `https://api.cnkgraph.com`；没有修改远端数据的请求。
+- 最终结果为 69/71 返回 HTTP 2xx；12 个接口组均已覆盖。
+- 两个失败接口均为自动笺注：`POST /api/tool/labelize` 返回 404 空响应，`GET /api/writing/10000/labelize` 返回 404“作者不存在”。
+- 其余词汇典故、词谱、地理、古籍、类书、年历、曲谱、人物、诗文、韵典、字典和工具请求均按代表参数返回 200。
+- 原始请求、状态、耗时、响应形态及受限响应样本保存到 `data/generated/cnkgraph_all_probe.json`。
+- 完整测试与适用性报告保存到 `data/generated/cnkgraph_api_test_report.md`，包含 71 项明细和面向清商近中远期目标的论证。
+- 近期建议优先评估诗文详情/平仄/出处、词汇典故、词谱、韵典、字典及出处与化用分析；两个自动笺注接口暂缓。
+- 中期再接人物、地理、年历、古籍和类书，并先设计外部实体 ID、来源及人工消歧流程；曲谱和全库遍历放到远期。
+- 当前只证明 2026-06-20 单次顺序请求的可访问性；未验证授权许可、限流、并发、SLA、长期稳定性和字段兼容性。
+- 尚未把 CNKGraph 接入 FastAPI、Tool Layer、缓存或数据库；未修改 poems 接口和数据库结构。
+
+### 2026-06-20 CNKGraph 词汇、典故 API probe
+
+- 新增 `scripts/probe_cnkgraph_glossary.py`，请求定义来自 `docs/cnkgraph/postman/词汇、典故.postman_collection.json`。
+- 使用 `https://api.cnkgraph.com` 实测 5 个接口：词典 ID、典故 ID、佛典 ID、词典批量 ID、典故关键词查询。
+- 5 个请求均返回 HTTP 200，单次耗时约 20–105 ms。
+- 完整请求和响应保存到 `data/generated/cnkgraph_glossary_probe.json`。
+- 词典 ID 10 返回“青山”和 3 条释义；佛典 ID 100 返回“一心专念”和 2 条释义。
+- 批量词典接口按 `[10, 15, 30, 42]` 返回 4 条结果：“青山、不见、悠悠、芙蓉”。
+- 典故 ID 1000 返回关键词、相关人物、关联、出处、引文和解释等字段。
+- 典故关键词“桃花”返回 3 个候选，ID 为 733、1907、2000。
+- 当前仅验证示例请求成功；未测试无效 ID、空关键词、限流、并发、长期稳定性和使用许可。
+- 尚未把 CNKGraph 接入 FastAPI、Tool Layer、缓存或数据库。
+- `python -m compileall app scripts` 已通过。
 
 ### 2026-06-19 注释规范化
 

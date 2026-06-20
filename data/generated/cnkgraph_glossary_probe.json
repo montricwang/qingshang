@@ -1,0 +1,461 @@
+{
+  "generated_at": "2026-06-20T13:15:12.016082+00:00",
+  "source_collection": "docs/cnkgraph/postman/词汇、典故.postman_collection.json",
+  "base_url": "https://api.cnkgraph.com",
+  "summary": {
+    "total": 5,
+    "successful": 5,
+    "failed": 0
+  },
+  "results": [
+    {
+      "name": "glossary_by_id",
+      "method": "GET",
+      "path": "/api/glossary/词典/10",
+      "request_url": "https://api.cnkgraph.com/api/glossary/%E8%AF%8D%E5%85%B8/10",
+      "status_code": 200,
+      "ok": true,
+      "elapsed_ms": 74.72,
+      "response_content_type": "application/json; charset=utf-8",
+      "response_body_format": "json",
+      "response_body": {
+        "Word": "青山",
+        "OriginalWord": "青山",
+        "From": "漢語大詞典",
+        "Spellings": "qīng shān",
+        "Explains": [
+          "(1).青葱的山岭。<span class=\"book\">《<a href='https://cnkgraph.com/Book/2161' target='_blank'>管子·地员</a>》</span>：“青山十六施，百一十二尺而至于泉。” 唐 <a href='/People/15783' target='_blank'>徐凝</a> <a href='/Writing/43392' target='_blank'>《别白公》</a>诗：“青山旧路在，白首醉还乡。”<span class=\"book\">《四游记·玉帝起赛宝通明会》</span>：“一见我这里青山隐隐，緑水迢迢，便问我借与他居住。” 海默 <span class=\"book\">《我的引路人》</span>五：“留得青山在，不怕没柴烧。”",
+          "(2).指归隐之处。 唐 <a href='/People/20204' target='_blank'>贾岛</a> <a href='/Writing/44141' target='_blank'>《答王建秘书》</a>诗：“白髮无心镊，青山去意多。” 宋 <a href='/People/29783' target='_blank'>范仲淹</a> <a href='/Writing/171973' target='_blank'>《寄石学士》</a>诗：“与君尝大言，定作青山隣。” <a href='/People/74401' target='_blank'>严复</a> <a href='/Writing/274553' target='_blank'>《送沈涛园备兵淮扬》</a>诗之一：“相看白髮盈头出，长恐青山与愿违。”",
+          "(3).山名。一名 青林山 。 南朝 诗人 谢朓 曾卜居于此，故又称 谢公山 。在今 安徽省 当涂县 东南。 刘义庆 <span class=\"book\">《<a href='https://cnkgraph.com/Book/2320' target='_blank'>世说新语·文学</a>》</span>“ 袁宏 始作<span class=\"book\">《东征赋》</span>” 南朝 梁 刘孝标 注：“后游 青山 饮酌，既归，公命 宏 同载，众为危惧。” 唐 <a href='/People/15188' target='_blank'>李白</a> <a href='/Writing/25804' target='_blank'>《题东溪公幽居》</a>诗：“宅近 青山 同 谢朓 ，门垂碧柳似 陶潜 。” 宋 <a href='/People/27865' target='_blank'>杨万里</a> <a href='/Writing/126478' target='_blank'>《望谢家青山太白墓》</a>诗：“ 阿朓 青山 自一村，州民岁岁与招魂。 六朝 陵墓今安在，只有诗仙月下坟。”"
+        ],
+        "Categories": [
+          "青",
+          "园圃",
+          "山",
+          "青山",
+          "青葱",
+          "山名",
+          "归隐",
+          "山岭",
+          "诗人",
+          "于此"
+        ],
+        "Kind": 1,
+        "Id": 10
+      }
+    },
+    {
+      "name": "allusion_by_id",
+      "method": "GET",
+      "path": "/api/glossary/典故/1000",
+      "request_url": "https://api.cnkgraph.com/api/glossary/%E5%85%B8%E6%95%85/1000",
+      "status_code": 200,
+      "ok": true,
+      "elapsed_ms": 17.38,
+      "response_content_type": "application/json; charset=utf-8",
+      "response_body_format": "json",
+      "response_body": {
+        "CountInWritings": 60,
+        "Keys": [
+          "二石弓",
+          "不識一丁",
+          "一丁不識",
+          "丁字不識",
+          "弓兩石",
+          "不若一丁字",
+          "空腹無丁字",
+          "莫識一丁字"
+        ],
+        "RelatedPersons": null,
+        "Correlations": null,
+        "References": null,
+        "Quotes": [
+          {
+            "Book": "《新唐書》卷一百二十七〈張嘉貞列傳·張弘靖〉～4447～",
+            "Content": "長慶初，劉總舉所部內屬，請弘靖為代，進檢校司空，仍同中書門下平章事，充盧龍節度使。始入幽州，老幼夾道觀。河朔舊將與士卒均寒暑，無障蓋安輿，弘靖素貴，肩輿而行，人駭異。俗謂祿山、思明為「二聖」，弘靖懲始亂，欲變其俗，乃發墓毀棺，眾滋不悅。旬一決事，賓客將吏罕聞其言。委成於參佐韋雍、張宗厚，又不通大體，朘刻軍賜，專以法拫治之。官屬輕侻酣肆，夜歸，燭火滿街，前後呵止，其詬責士皆曰「反虜」，嘗曰：「天下無事，而輩挽兩石弓，不如識一丁字。」軍中以氣自任，銜之。"
+          },
+          {
+            "Book": "《能改齋漫錄》卷五〈辨誤·不如識一丁字〉～02～",
+            "Content": "《唐書》張宏靖傳：「背挽兩石弓，不如識一丁字。」舊史亦同。竇苹《唐書音訓》云：「丁恐當作個。」予嘗以竇說雖當，而無所據。偶讀孔毅父《續世說》，引宏靖曰：「汝曹能挽兩石弓，不若識一箇字。」乃作此箇字。因知箇誤為丁，無可疑者。"
+          }
+        ],
+        "Explains": null,
+        "Kind": 2,
+        "Id": 1000
+      }
+    },
+    {
+      "name": "buddhist_glossary_by_id",
+      "method": "GET",
+      "path": "/api/glossary/佛典/100",
+      "request_url": "https://api.cnkgraph.com/api/glossary/%E4%BD%9B%E5%85%B8/100",
+      "status_code": 200,
+      "ok": true,
+      "elapsed_ms": 16.34,
+      "response_content_type": "application/json; charset=utf-8",
+      "response_body_format": "json",
+      "response_body": {
+        "Word": "一心专念",
+        "OriginalWord": "一心專念",
+        "From": null,
+        "Spellings": null,
+        "Explains": [
+          "【佛學大辭典】",
+          "（術語）念佛之心專一也。往生論曰：「心常作願，一心專念，畢竟往生安樂國土。」善導之觀經疏四曰：「一心專念彌陀名號，行住坐臥，不問時節久遠，念念不捨者，是名正定之業。」"
+        ],
+        "Categories": null,
+        "Kind": 1,
+        "Id": 100
+      }
+    },
+    {
+      "name": "glossary_batch_by_ids",
+      "method": "POST",
+      "path": "/api/glossary/词典",
+      "json": [
+        10,
+        15,
+        30,
+        42
+      ],
+      "request_url": "https://api.cnkgraph.com/api/glossary/%E8%AF%8D%E5%85%B8",
+      "status_code": 200,
+      "ok": true,
+      "elapsed_ms": 17.92,
+      "response_content_type": "application/json; charset=utf-8",
+      "response_body_format": "json",
+      "response_body": [
+        {
+          "Word": "青山",
+          "OriginalWord": "青山",
+          "From": "漢語大詞典",
+          "Spellings": "qīng shān",
+          "Explains": [
+            "(1).青葱的山岭。<span class=\"book\">《<a href='https://cnkgraph.com/Book/2161' target='_blank'>管子·地员</a>》</span>：“青山十六施，百一十二尺而至于泉。” 唐 <a href='/People/15783' target='_blank'>徐凝</a> <a href='/Writing/43392' target='_blank'>《别白公》</a>诗：“青山旧路在，白首醉还乡。”<span class=\"book\">《四游记·玉帝起赛宝通明会》</span>：“一见我这里青山隐隐，緑水迢迢，便问我借与他居住。” 海默 <span class=\"book\">《我的引路人》</span>五：“留得青山在，不怕没柴烧。”",
+            "(2).指归隐之处。 唐 <a href='/People/20204' target='_blank'>贾岛</a> <a href='/Writing/44141' target='_blank'>《答王建秘书》</a>诗：“白髮无心镊，青山去意多。” 宋 <a href='/People/29783' target='_blank'>范仲淹</a> <a href='/Writing/171973' target='_blank'>《寄石学士》</a>诗：“与君尝大言，定作青山隣。” <a href='/People/74401' target='_blank'>严复</a> <a href='/Writing/274553' target='_blank'>《送沈涛园备兵淮扬》</a>诗之一：“相看白髮盈头出，长恐青山与愿违。”",
+            "(3).山名。一名 青林山 。 南朝 诗人 谢朓 曾卜居于此，故又称 谢公山 。在今 安徽省 当涂县 东南。 刘义庆 <span class=\"book\">《<a href='https://cnkgraph.com/Book/2320' target='_blank'>世说新语·文学</a>》</span>“ 袁宏 始作<span class=\"book\">《东征赋》</span>” 南朝 梁 刘孝标 注：“后游 青山 饮酌，既归，公命 宏 同载，众为危惧。” 唐 <a href='/People/15188' target='_blank'>李白</a> <a href='/Writing/25804' target='_blank'>《题东溪公幽居》</a>诗：“宅近 青山 同 谢朓 ，门垂碧柳似 陶潜 。” 宋 <a href='/People/27865' target='_blank'>杨万里</a> <a href='/Writing/126478' target='_blank'>《望谢家青山太白墓》</a>诗：“ 阿朓 青山 自一村，州民岁岁与招魂。 六朝 陵墓今安在，只有诗仙月下坟。”"
+          ],
+          "Categories": [
+            "青",
+            "园圃",
+            "山",
+            "青山",
+            "青葱",
+            "山名",
+            "归隐",
+            "山岭",
+            "诗人",
+            "于此"
+          ],
+          "Kind": 1,
+          "Id": 10
+        },
+        {
+          "Word": "不见",
+          "OriginalWord": "不见",
+          "From": "漢語大詞典",
+          "Spellings": "bù jiàn",
+          "Explains": [
+            "(1).看不到。<span class=\"book\">《<a href='https://cnkgraph.com/Book/950' target='_blank'>易·艮</a>》</span>：“行其庭，不见其人。” 唐 <a href='/People/21679' target='_blank'>韩愈</a> <a href='/Writing/49727' target='_blank'>《琴操·拘幽操》</a>诗：“朝不日出兮，夜不见月和星。” 茅盾 <span class=\"book\">《色盲》</span>：“ 李蕙芳 赶快拾起一片碎瓦，正想掷过去，那虾蟆一跳，便不见了。”",
+            "(2).谓不易看到。<span class=\"book\">《<a href='https://cnkgraph.com/Book/90' target='_blank'>左传·成公十六年</a>》</span>：“怨岂在明，不见是图。” 张舜徽 注：“谓防止怨恨不仅在明显之仇恨，尚须图谋不易见之细微怨恨。”",
+            "(3).不看，不读。<span class=\"book\">《<a href='https://cnkgraph.com/Book/2376' target='_blank'>梁书·任昉传</a>》</span>：“ 昉 坟籍无所不见，家虽贫，聚书至万餘卷。”",
+            "(4).用在“闻”“看”“找”等动词之后，表示行动没有结果。 清 <a href='/People/清朝/%e6%9d%8e%e6%b8%94' target='_blank'>李渔</a> <span class=\"book\">《奈何天·惊丑》</span>：“脚上那一种，做一头睡，自然闻不见，不消虑他。” 柯岩 <span class=\"book\">《快活的小诗·眼镜惹出了什么事情》</span>：“我的眼镜怎么找不见？”"
+          ],
+          "Categories": [
+            "怀旧",
+            "干谒",
+            "不见",
+            "不易",
+            "动词",
+            "行动",
+            "结果"
+          ],
+          "Kind": 1,
+          "Id": 15
+        },
+        {
+          "Word": "悠悠",
+          "OriginalWord": "悠悠",
+          "From": "漢語大詞典",
+          "Spellings": "yōu yōu",
+          "Explains": [
+            "(1).思念貌；忧思貌。<a href='/Writing/138' target='_blank'>《诗·邶风·终风》</a>：“莫往莫来，悠悠我思。” 郑玄 笺：“言我思其如是，心悠悠然。”<span class=\"book\">《<a href='https://cnkgraph.com/Book/2562' target='_blank'>后汉书·章帝纪</a>》</span>：“中心悠悠，将何以寄？” 唐 <a href='/People/12602' target='_blank'>乔知之</a> <a href='/Writing/15786' target='_blank'>《定情篇》</a>：“去时恩灼灼，去罢心悠悠。” 元 <a href='/People/37693' target='_blank'>乔吉</a> <a href='/Writing/932351' class='poemCommentLink' target='_blank'>《金钱记》</a>第三折：“心绪悠悠，不明白这场迤逗。”",
+            "(2).辽阔无际；遥远。<a href='/Writing/173' target='_blank'>《诗·王风·黍离》</a>：“知我者谓我心忧，不知我者谓我何求，悠悠苍天，此何人哉？” 毛 传：“悠悠，远意。” 晋 <a href='/People/8894' target='_blank'>陶潜</a> <a href='/Writing/1130' target='_blank'>《饮酒》</a>诗之十九：“世路廓悠悠， 杨朱 所以止。” 康有为 <span class=\"book\">《除夕答从兄弟沛然秀才时将入京上书》</span>诗：“鼎鼎百年言笑速，悠悠万里别离难。”",
+            "(3).久长；久远。<a href='/Writing/413' target='_blank'>《楚辞·九辩》</a>：“去白日之昭昭兮，袭长夜之悠悠。” 唐 <a href='/People/17270' target='_blank'>杜甫</a> <a href='/Writing/31469' target='_blank'>《发秦州》</a>诗：“大哉乾坤内，吾道长悠悠。” 唐 <a href='/People/18804' target='_blank'>白居易</a> <a href='/Writing/14415' target='_blank'>《长恨歌》</a>：“悠悠生死别经年，魂魄不曾来入梦。” 明 <a href='/People/明朝/%e6%9d%8e%e4%b8%9c%e9%98%b3' target='_blank'>李东阳</a> <span class=\"book\">《次钱与谦修撰韵》</span>：“有口莫问天，天道长悠悠。” 韩北屏 <span class=\"book\">《非洲夜会·非斯印象》</span>：“我们可以从那里读到历史的章节，可以辨认出悠悠岁月的容貌。”",
+            "(4).连绵不尽貌。 晋 <a href='/People/魏晉/%e5%b7%a6%e6%80%9d' target='_blank'>左思</a> <a href='/Writing/1336594' class='poemCommentLink' target='_blank'>《吴都赋》</a>：“直衝涛而上瀨，常沛沛以悠悠。” 唐 <a href='/People/18032' target='_blank'>温庭筠</a> <a href='/Writing/48581' target='_blank'>《梦江南》</a>词：“过尽千帆皆不是，斜暉脉脉水悠悠。” 清 <a href='/People/清朝/%e8%ae%b8%e6%89%bf%e9%92%a6' target='_blank'>许承钦</a> <span class=\"book\">《回风矶》</span>诗：“长年憎去楫，贾客怨回风，不分乾坤意，悠悠尽向东。” 朱德 <span class=\"book\">《花溪》</span>诗：“春风送暖百花开，流水悠悠曲折回。”",
+            "(5).众多貌。<span class=\"book\">《<a href='https://cnkgraph.com/Book/4412' target='_blank'>史记·孔子世家</a>》</span>：“ 桀溺 曰：‘悠悠者天下皆是也。’”<a href='/Writing/1341075' class='poemCommentLink' target='_blank'>《后汉书·朱穆传》</a>：“然而时俗或异，风化不敦，而尚相诽谤，谓之臧否。记短则兼折其长，贬恶则并伐其善。悠悠者皆是，其可称乎！” 李贤 注：“悠悠，多也。称，举也。” 晋 <a href='/People/6463' target='_blank'>傅玄</a> <a href='/Writing/488205' target='_blank'>《两仪诗》</a>：“日月西流景东征，悠悠万物殊品名。” 唐 <a href='/People/唐朝/%e6%ac%a7%e9%98%b3%e8%a9%b9' target='_blank'>欧阳詹</a> <span class=\"book\">《怀忠赋》</span>：“欲悠悠而罔极，毒浩浩其无涯。” 宋 <a href='/People/27305' target='_blank'>曾巩</a> <a href='/Writing/220283' target='_blank'>《雪后》</a>诗：“风光苒苒流双轂，人事悠悠寄一枰。”",
+            "(6).世俗；一般。 晋 <a href='/People/魏晉/%e9%99%b6%e6%bd%9c' target='_blank'>陶潜</a> <span class=\"book\">《饮酒》</span>诗之十二：“摆脱悠悠谈，请从余听之。” 五代 王定保 <a href='/Writing/1368882' class='poemCommentLink' target='_blank'>《唐摭言·师友》</a>：“僕以礼处足下，则足下长者，僕心未忍；欲以故人处足下，则虑悠悠之人，以僕为诡。” 明 <a href='/People/42193' target='_blank'>何景明</a> <a href='/Writing/438009' target='_blank'>《赠李献吉》</a>诗之三：“悠悠行路子，谁为识其音。” 清 <a href='/People/清朝/%e9%92%ae%e7%90%87' target='_blank'>钮琇</a> <span class=\"book\">《<a href='https://cnkgraph.com/Book/5701' target='_blank'>觚賸续编·张羽军</a>》</span>：“大丈夫一日定交，则终身生死以之。彼须金而结者，悠悠世上人耳，非所望於公也。”",
+            "(7).引申为庸俗，荒谬。 清 <a href='/People/清朝/%e8%92%b2%e6%9d%be%e9%be%84' target='_blank'>蒲松龄</a> <span class=\"book\">《<a href='https://cnkgraph.com/Book/6951' target='_blank'>聊斋志异·冷生</a>》</span>：“大笑成文，亦一快事，何至以此褫革，如此主司，寧非悠悠！” 清 <a href='/People/清朝/%e8%92%b2%e6%9d%be%e9%be%84' target='_blank'>蒲松龄</a> <span class=\"book\">《<a href='https://cnkgraph.com/Book/6951' target='_blank'>聊斋志异·红玉</a>》</span>：“然官宰悠悠，竖人毛髮，刀震震入木，何惜不略移牀上半尺许哉？” 何垠 注：“悠悠，繆悠也。”",
+            "(8).指世俗之人，众人。<span class=\"book\">《<a href='https://cnkgraph.com/Book/2251' target='_blank'>宋书·刘穆之传</a>》</span>：“﹝ 诸葛长民 ﹞乃屏人谓 穆之 曰：‘悠悠之言，皆云太尉与我不平。’” 宋 <a href='/People/29828' target='_blank'>苏舜钦</a> <a href='/Writing/495781' target='_blank'>《答和叔春日舟行》</a>诗：“寄语悠悠莫疑我，五湖今作狎鸥翁。”",
+            "(9).飘动貌。<a href='/Writing/287' target='_blank'>《诗·小雅·车攻》</a>：“萧萧马鸣，悠悠旆旌。” 唐 <a href='/People/17734' target='_blank'>武元衡</a> <a href='/Writing/37337' target='_blank'>《长安叙怀寄崔十五》</a>诗：“萧萧霓旌合仙仗，悠悠剑佩入炉烟。” 臧克家 <span class=\"book\">《泪－－悼念周总理》</span>诗：“半旗悠悠，秋风漫吹。”",
+            "(10).动荡；飘忽不定。<span class=\"book\">《<a href='https://cnkgraph.com/Book/2166' target='_blank'>孔丛子·对魏王</a>》</span>：“今天下悠悠，士亡定处，有德则往，无德则去。” 唐 <a href='/People/14615' target='_blank'>元稹</a> <a href='/Writing/6669' target='_blank'>《酬乐天得微之诗知通州事》</a>诗之一：“知得共君相见否，近来魂梦转悠悠。” 南唐 <a href='/People/14737' target='_blank'>冯延巳</a> <a href='/Writing/10841' target='_blank'>《鹊踏枝》</a>词：“撩乱春愁如柳絮，悠悠梦里无寻处。” 元 <a href='/People/元朝/%e6%97%a0%e5%90%8d%e6%b0%8f' target='_blank'>无名氏</a> <span class=\"book\">《冤家债主》</span>第三折：“还只道沉沉的卧著床褥，谁知他悠悠的赴了冥途。” 周肖 <span class=\"book\">《霞岛》</span>第六章：“夜深了，乳白色的夜雾飘飘悠悠，漫上了座落在半坡的操场。”",
+            "(11).游荡貌；懒散不尽心貌。 唐 <a href='/People/21646' target='_blank'>高适</a> <a href='/Writing/45686' target='_blank'>《涟上送别王秀才》</a>诗：“行矣当自爱，壮年莫悠悠。”<span class=\"book\">《<a href='https://cnkgraph.com/Book/1715' target='_blank'>朱子语类</a>》</span>卷六七：“某病后，自知日月已不多，故欲力勉。诸公不可悠悠！” 明 <a href='/People/明朝/%e7%8e%8b%e5%bb%b7%e7%9b%b8' target='_blank'>王廷相</a> <span class=\"book\">《雅述上》</span>：“机虽日发乎前，不过悠悠坐视而已，此国事所以日不可为也。” 清 <a href='/People/清朝/%e8%92%b2%e6%9d%be%e9%be%84' target='_blank'>蒲松龄</a> <span class=\"book\">《<a href='https://cnkgraph.com/Book/6951' target='_blank'>聊斋志异·折狱</a>》</span>：“世之折狱者，非悠悠置之，则縲繫数千人而狼籍之耳。”",
+            "(12).闲适貌。<a href='/Writing/1355638' class='poemCommentLink' target='_blank'>《梁书·张充传》</a>：“若廼飞竿钓渚，濯足沧洲；独浪烟霞，高卧风月。悠悠琴酒，岫远谁来；灼灼文谈，空罢方寸。” 唐 <a href='/People/21646' target='_blank'>高适</a> <a href='/Writing/45670' target='_blank'>《封丘县》</a>诗：“我本渔樵 孟诸 野，一生自是悠悠者。” 金 麻革 <a href='/Writing/263119' target='_blank'>《晚步张巩田间》</a>诗：“悠悠独鸟穿云下，策策寒乌掠日飞。” 清 <a href='/People/清朝/%e5%8d%93%e5%b0%94%e5%a0%aa' target='_blank'>卓尔堪</a> <span class=\"book\">《雨中过秋浦》</span>诗：“岸花红寂寂，江鸟白悠悠。”",
+            "(13).形容声音气息缓慢细长。 唐 <a href='/People/18616' target='_blank'>王维</a> <a href='/Writing/9348' target='_blank'>《秋夜独坐》</a>诗：“夜静羣动息，蟪蛄声悠悠。”<span class=\"book\">《水浒传》</span>第八一回：“ 李师师 执盏擎杯，亲与 燕青 回酒谢唱，口儿里悠悠放出些妖嬈声嗽，来惹 燕青 。”<span class=\"book\">《<a href='https://cnkgraph.com/Book/6915' target='_blank'>儿女英雄传</a>》</span>第六回：“ 安公子 此时已是魂飞魄散，背了过去，昏不知人，只剩得悠悠的一丝气儿在喉间流留。” 曹禺 <span class=\"book\">《北京人》</span>第三幕：“ 愫方 ：（悠悠地）也许有一天我会离开。”",
+            "(14).黝黑幽暗貌。悠，通“ 儵 ”。 南朝 梁简文帝 <a href='/Writing/1354641' class='poemCommentLink' target='_blank'>《华阳陶先生墓志铭》</a>：“鬱鬱方崖，悠悠洞天，三山白鹤，何时復旋。”<span class=\"book\">《西游记》</span>第六一回：“只杀得星不光兮月不皎，一天寒雾黑悠悠。”"
+          ],
+          "Categories": [
+            "怀旧",
+            "众多",
+            "世俗",
+            "思念貌",
+            "思念",
+            "辽阔",
+            "飘动貌",
+            "久长",
+            "连绵",
+            "飘动",
+            "众多貌",
+            "闲适",
+            "游荡",
+            "动荡",
+            "闲适貌",
+            "世俗之人",
+            "黝黑",
+            "无际",
+            "不尽",
+            "幽暗",
+            "久远",
+            "一般",
+            "声音",
+            "庸俗",
+            "忧思貌",
+            "飘忽不定",
+            "音气",
+            "忧思",
+            "气息",
+            "懒散",
+            "遥远",
+            "荒谬",
+            "众人",
+            "缓慢",
+            "细长"
+          ],
+          "Kind": 1,
+          "Id": 30
+        },
+        {
+          "Word": "芙蓉",
+          "OriginalWord": "芙蓉",
+          "From": "漢語大詞典",
+          "Spellings": "fú róng",
+          "Explains": [
+            "(1).荷花的别名。<a href='/Writing/437' target='_blank'>《楚辞·离骚》</a>：“製芰荷以为衣兮，集芙蓉以为裳。” 洪兴祖 补注：“<span class=\"book\">《本草》</span>云：其叶名荷，其华未发为菡萏，已发为芙蓉。” 唐 王维 <span class=\"book\">《临湖亭》</span>诗：“当轩对樽酒，四面芙蓉开。” 清 <a href='/People/清朝/%e5%94%90%e5%ad%99%e5%8d%8e' target='_blank'>唐孙华</a> <span class=\"book\">《晚秋狮子林小集》</span>诗之一：“三径林香穿竹树，一池波影漾芙蓉。”",
+            "(2).木莲，即木芙蓉。落叶大灌木，叶大掌状浅裂，秋季开花，花大有柄，色有红白，晚上变深红。可插枝蕃植，供观赏，叶和花均可入药。 隋 <a href='/People/10455' target='_blank'>江总</a> <a href='/Writing/3258' target='_blank'>《南越木槿赋》</a>：“千叶芙蓉詎相似，百枝灯花復羞燃。” 宋 <a href='/People/24788' target='_blank'>宋祁</a> <a href='/Writing/104421' target='_blank'>《木芙蓉》</a>诗：“芙蓉本作树，花叶两相宜。慎勿迷莲子，分明立券辞。” 清 <a href='/People/清朝/%e6%a2%81%e7%bb%8d%e5%a3%ac' target='_blank'>梁绍壬</a> <span class=\"book\">《<a href='https://cnkgraph.com/Book/5738' target='_blank'>两般秋雨盦随笔·芙蓉</a>》</span>：“ 岭 南木芙蓉，有一日白花，次日稍红，又次日深红者，名曰‘三日醉芙蓉’。”",
+            "(3).<span class=\"book\">《<a href='https://cnkgraph.com/Book/8073' target='_blank'>西京杂记</a>》</span>卷二：“ 文君 姣好，眉色如望远山，脸际常若芙蓉。”后因以“芙蓉”喻指美女。 清 <a href='/People/清朝/%e8%92%b2%e6%9d%be%e9%be%84' target='_blank'>蒲松龄</a> <span class=\"book\">《<a href='https://cnkgraph.com/Book/6951' target='_blank'>聊斋志异·鸦头</a>》</span>：“室对芙蓉，家徒四壁。”",
+            "(4).宝剑名。 明 <a href='/People/明朝/%e6%b1%a4%e6%98%be%e7%a5%96' target='_blank'>汤显祖</a> <span class=\"book\">《南柯记·侠概》</span>：“一生游侠在 江 淮 ，未老芙蓉説剑才。”参见“ 芙蓉剑 ”。"
+          ],
+          "Categories": [
+            "盖伞",
+            "镜",
+            "屏障",
+            "帐",
+            "塔",
+            "髻",
+            "簪",
+            "带",
+            "裳",
+            "衣",
+            "冠",
+            "溪",
+            "芙蓉",
+            "宝剑",
+            "荷花",
+            "木莲",
+            "宝剑名",
+            "剑名",
+            "木芙蓉",
+            "落叶",
+            "灌木",
+            "美女",
+            "女子"
+          ],
+          "Kind": 1,
+          "Id": 42
+        }
+      ]
+    },
+    {
+      "name": "allusion_find_by_keyword",
+      "method": "POST",
+      "path": "/api/glossary/典故/find",
+      "json": {
+        "key": "桃花",
+        "charIndex": "end"
+      },
+      "request_url": "https://api.cnkgraph.com/api/glossary/%E5%85%B8%E6%95%85/find",
+      "status_code": 200,
+      "ok": true,
+      "elapsed_ms": 20.53,
+      "response_content_type": "application/json; charset=utf-8",
+      "response_body_format": "json",
+      "response_body": [
+        {
+          "CountInWritings": 10654,
+          "Keys": [
+            "武陵溪",
+            "桃花源",
+            "桃花流水",
+            "武陵源",
+            "桃源路",
+            "武陵春",
+            "避秦人",
+            "武陵人",
+            "桃花洞",
+            "桃源人",
+            "不知秦",
+            "桃源客",
+            "桃源",
+            "桃源境",
+            "武陵洞",
+            "洞中人",
+            "武陵客",
+            "武陵桃花",
+            "桃源雞犬",
+            "不知有漢",
+            "武陵路",
+            "秦洞",
+            "武陵水",
+            "見秦人",
+            "問秦人",
+            "源桃",
+            "流水桃源",
+            "避世桃源",
+            "武陵事",
+            "源花",
+            "秦人雞犬",
+            "花源",
+            "秦人跡",
+            "秦人路",
+            "避秦",
+            "秦人溪",
+            "逃秦人",
+            "武陵趣",
+            "隱桃花",
+            "避秦村",
+            "迷武陵",
+            "如今不是秦",
+            "桃花閉洞門",
+            "聞犬洞",
+            "避秦溪",
+            "洞犬謝秦人",
+            "秦漢迷",
+            "秦人南避",
+            "秦人桃花",
+            "秦世客",
+            "秦漁",
+            "如今已是漢",
+            "山中秦晉",
+            "逃秦",
+            "漁父桃花",
+            "桃散武陵霞",
+            "桃源士",
+            "武陵",
+            "嫌秦",
+            "尋源",
+            "避秦路",
+            "不識東西晉",
+            "晉客入洞",
+            "秦客",
+            "秦人洞天",
+            "桃花迷洞口",
+            "桃源土",
+            "仙源",
+            "源水無路"
+          ],
+          "RelatedPersons": [
+            {
+              "Name": "陶潛",
+              "PersonId": 8894
+            }
+          ],
+          "Correlations": null,
+          "References": [
+            "阮郎"
+          ],
+          "Quotes": [
+            {
+              "Book": "《陶淵明集》卷六〈桃花源記〉",
+              "Content": "晉太元中，武陵人捕魚為業。緣溪行，忘路之遠近，忽逢桃花林，夾岸數百步，中無雜樹。芳草鮮美，落英繽紛。漁人甚異之，復前行，欲窮其林。林盡水源，便得一山，山有小口，仿佛若有光，便捨船從口入。初極狹，纔通人，復行數十步，豁然開朗。土地平曠，屋舍儼然，有良田美池桑竹之屬，阡陌交通，雞犬相聞，其中往來種作，男女衣著，悉如外人。黃髮垂髫，並怡然自樂，見漁人，乃大驚，問所從來，具荅之。便要還家，設酒殺雞作食，村中聞有此人，咸來問訊。自云先世避秦時亂，率妻子邑人，來此絕境，不復出焉。遂與外人閒隔，問今是何世，乃不知有漢，無論魏晉。此人一一為具言所聞，皆歎惋，餘人各復延至其家，皆出酒食，停數日辭去，此中人語，云不足為外人道也。既出，得其船，便扶向路，處處誌之，及郡下，詣太守說如此，太守劉歆即遣人隨之往，尋向所誌，遂迷不復得路。南陽劉子驥，高尚士也，聞之欣然。親往未果，尋病終，後遂無問津者。"
+            }
+          ],
+          "Explains": [
+            {
+              "Key": "桃源",
+              "Explain": "后用以指隐居处或仙境。唐杜甫《不寐》：“多垒满山谷，桃源何处求？”"
+            }
+          ],
+          "Kind": 2,
+          "Id": 733
+        },
+        {
+          "CountInWritings": 576,
+          "Keys": [
+            "桃花水",
+            "春水漾桃花"
+          ],
+          "RelatedPersons": null,
+          "Correlations": null,
+          "References": null,
+          "Quotes": [
+            {
+              "Book": "《漢書》卷二十九〈溝洫志〉～689～",
+              "Content": "後二歲，河復決平原，流入濟南、千乘，所壞敗者半建始時，復遣王延世治之。杜欽說大將軍王鳳，以為「前河決，丞相史楊焉言延世受焉術以塞之，蔽不肯見。今獨任延世，延世見前塞之易，恐其慮害不深。又審如焉言，延世之巧，反不如焉。且水勢各異，不博議利害而任一人，如使不及今冬成，來春桃華水盛，必羨溢，有填淤反壤之害。」唐·顏師古注曰：「《月令》：『仲春之月，始雨水，桃始華』。蓋桃方華時，既有雨水，川谷冰泮，?流猥集，波瀾盛長，故謂之桃華水耳。」"
+            },
+            {
+              "Book": "《歲時廣記》一卷之一〈春景·桃花水〉～22～",
+              "Content": "《水衡記》：「黃河水二月、三月名桃花水。」又顏師古《漢書》音義云：「月令仲春之月始雨水，桃始華。蓋桃方華時既有雨水，川谷漲泮，眾流盛長，故謂之桃花水。」老杜詩云：「春岸桃花水。」又曰：「三月桃花浪。」注曰：「峽以二月桃花發時春水生謂之桃花水。」王摩詰詩云：「春來到處桃花水。」歐陽公詩云：「桃花水下清時路。」"
+            }
+          ],
+          "Explains": null,
+          "Kind": 2,
+          "Id": 1907
+        },
+        {
+          "CountInWritings": 277,
+          "Keys": [
+            "桃花人面",
+            "人面桃花",
+            "去年人面",
+            "笑桃門巷",
+            "粉面不知何處在",
+            "門裡桃邊",
+            "桃門笑",
+            "崔護",
+            "去年此日家人倚"
+          ],
+          "RelatedPersons": [
+            {
+              "Name": "崔護",
+              "PersonId": 14776
+            }
+          ],
+          "Correlations": null,
+          "References": null,
+          "Quotes": [
+            {
+              "Book": "《本事詩·情感》",
+              "Content": "博陵崔護，姿質甚美，而孤潔寡合。舉進士下第。清明日，獨遊都城南，得居人莊，一畝之宮，而花木叢萃，寂若無人。扣門久之，有女子自門隙窺之，問曰：「誰耶？」以姓字對，曰：「尋春獨行，酒渴求飲。」女入，以杯水至，開門設?命坐，獨倚小桃斜柯佇立，而意屬殊厚，妖姿媚態，綽有餘妍。崔以言挑之，不對，目注者久之。崔辭去，送至門，如不勝情而入。崔亦睠盼而歸，嗣後絕不復至。及來歲清明日，忽思之，情不可抑，徑往尋之。門牆如故，而已鎖扃之。因題詩於左扉曰：「去年今日此門中，人面桃花相映紅。人面秖今何處去？桃花依舊笑春風。」後數日，偶至都城南，復往尋之，聞其中有哭聲，扣門問之，有老父出曰：「君非崔護邪？」曰：「是也。」又哭曰：「君殺吾女。」護驚起，莫知所答。老父曰：「吾女笄年知書，未適人，自去年以來，常恍惚若有所失。比日與之出，及歸，見左扉有字，讀之，入門而病，遂絕食數日而死。吾老矣，此女所以不嫁者，將求君子以託吾身，今不幸而殞，得非君殺之耶？」又特大哭。崔亦感慟，請入哭之。尚儼然在床。崔舉其首，枕其股，哭而祝曰：「某在斯，某在斯。」須臾開目，半日復活矣。父大喜，遂以女歸之。"
+            },
+            {
+              "Book": "《太平廣記》卷二百七十四〈情感·崔護〉～258～",
+              "Content": "博陵崔護，資質甚美，而孤潔寡合。舉進士第。清明日，獨遊都城南，得居人莊。一畝之宮，花木叢萃，寂若無人。扣門久之，有女子自門隙窺之，問曰：「誰耶？」。護以姓字對，曰：「尋春獨行，酒渴求飲。女入，以盃水至，開門，設床命坐，獨倚小桃斜柯佇立，而意屬殊厚，妖姿媚態，綽有餘妍。崔以言挑之，不對，彼此目注者久之。崔辭去，送至門，如不勝情而入。崔亦睠盻而歸，爾後絕不復至。及來歲清明日，忽思之，情不可抑，徑往尋之。門院如故，而已扃鎖之。崔因題詩於左扉曰：「去年今日此門中，人面桃花相映紅。人面不知何處去，桃花依舊笑春風。」後數日，偶至都城南，復往尋之，聞其中有哭聲，扣門問之，有老父出曰：「君非崔護耶？」曰：「是也。」又哭曰：「君殺吾女。」崔驚怛，莫知所答。父曰：「吾女笄年知書，未適人，自去年已來，常恍惚若有所失。比日與之出，及歸，見在左扉有字，讀之，入門而病，遂絕食數日而死。吾老矣，惟此一女，所以不嫁者，將求君子，以託吾身。今不幸而殞，得非君殺之耶？」又持崔大哭。崔亦感慟，請入哭之。尚儼然在床。崔舉其首，枕其股，哭而祝曰：「某在斯。」須臾開目，半日復活。老父大喜，遂以女歸之。"
+            }
+          ],
+          "Explains": [
+            {
+              "Key": "人面桃花",
+              "Explain": "喻艳遇。宋苏轼《上巳日与二三子携酒出游》：“映帘空复小桃枝，乞浆不见譍门女。”"
+            },
+            {
+              "Key": "人面桃花",
+              "Explain": "喻女子美貌。清黄遵宪《不忍地晚游诗》之七：“鸦背斜阳闪闪红，桃花人面薄纱笼。”"
+            }
+          ],
+          "Kind": 2,
+          "Id": 2000
+        }
+      ]
+    }
+  ]
+}

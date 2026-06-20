@@ -1,8 +1,9 @@
 """定义应用配置。"""
 
+from typing import ClassVar
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import ClassVar
 
 
 class Settings(BaseSettings):
@@ -17,6 +18,10 @@ class Settings(BaseSettings):
     llm_model: str
     llm_temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     llm_timeout_seconds: float = Field(default=30.0, gt=0)
+
+    # --- CNKGraph 外部工具配置 ---
+    cnkgraph_base_url: str = "https://api.cnkgraph.com"
+    cnkgraph_timeout_seconds: float = Field(default=10.0, gt=0)
 
     # --- 数据库配置 ---
     database_url: str
