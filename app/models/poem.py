@@ -4,7 +4,6 @@ from __future__ import annotations  # 允许类型标注引用后面才声明的
 
 from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
 from app.db.base import Base
 
 
@@ -13,7 +12,7 @@ class PoemModel(Base):
 
     __tablename__: str = "poems"
 
-    __table_args__ = (
+    __table_args__: tuple[UniqueConstraint] = (
         UniqueConstraint(
             "author",
             "author_order",
@@ -104,7 +103,7 @@ class PoemSectionModel(Base):
 
     __tablename__: str = "poem_sections"
 
-    __table_args__ = (
+    __table_args__: tuple[UniqueConstraint] = (
         UniqueConstraint(
             "poem_db_id",
             "section_no",
@@ -144,7 +143,7 @@ class PoemLineModel(Base):
 
     __tablename__: str = "poem_lines"
 
-    __table_args__ = (
+    __table_args__: tuple[UniqueConstraint, UniqueConstraint] = (
         UniqueConstraint(
             "poem_db_id",
             "global_line_no",
