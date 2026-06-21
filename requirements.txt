@@ -7,4 +7,5 @@ pydantic-settings==2.7.0
 pytest==8.3.4
 python-dotenv==1.0.1
 SQLAlchemy==2.0.36
+streamlit==1.41.1
 uvicorn[standard]==0.32.1

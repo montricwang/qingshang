@@ -1,11 +1,8 @@
 # Qingshang 项目现状同步
 
-> 生成日期：2026-06-20
-> 仓库基线：`main` / `746a682`
-> 当前工作区：新增 CNKGraph 全接口 probe、原始结果和项目适用性报告
-> 最近两次提交：
-> `746a682 refactor: update type annotations for table arguments in poem models`
-> `b9b030f refactor: centralize app configurations and enforce fail-fast runtime validation`
+> 更新日期：2026-06-21
+> 仓库基线：`main` / `c5e5160`
+> 当前工作区：新增 Reader v0.1.5 Streamlit 可视化阅读器，后端与数据库结构未改动
 
 ## 1. 当前代码现状
 
@@ -30,8 +27,30 @@ HTTP 请求
   -> JSON 响应
 ```
 
-当前只包含后端、数据清洗/导入脚本和少量单元测试，没有前端、用户系统、权限系统、
-Alembic 数据库迁移、Docker 配置或 CI。
+当前包含 FastAPI 后端、Reader v0.1.5 Streamlit 前端、数据清洗/导入脚本和单元测试。
+当前没有用户系统、权限系统、Alembic 数据库迁移、Docker 配置或 CI。
+
+### 2026-06-21 Reader v0.1.5
+
+- 新增 `apps/reader_app.py`，通过现有 FastAPI 读取本地周邦彦词作，不直接访问数据库。
+- 左侧目录支持筛选和分页；正文区展示词牌、题名、题序、分片和逐句按钮，点击词句会填入右侧选中文本。
+- 阅读辅助统一调用 `POST /api/poems/{poem_id}/reading-aids`，可手动选择典故、出处、字典、韵部和词谱工具。
+- 结果按“字词释义、典故候选、出处与化用、韵部、词谱 / 平仄”分区，只展示清商窄模型中的证据字段，不展示 CNKGraph `raw`。
+- 外部辅助失败时在右栏显示错误，词作正文仍保持可读；不做自动候选提取、LLM 综合解释或 Agent 调度。
+- 新增 `apps/assets/reader-landscape.webp` 作为阅读器横幅，并新增 `.streamlit/config.toml` 固定轻量主题。
+- `requirements.txt` 新增 `streamlit==1.41.1`；`.env.example` 新增 `QINGSHANG_API_BASE_URL`。
+- AI 自动识别候选与 AI 综合解释目前均为下一版本占位区。
+
+启动命令：
+
+```bash
+.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+.venv\Scripts\python.exe -m streamlit run apps/reader_app.py
+```
+
+默认地址：FastAPI 为 `http://127.0.0.1:8000`，Reader 为 `http://127.0.0.1:8501`。
+
+当前验证：Reader 能加载 188 首周邦彦词作、选择词作、点击词句回填查询框，并以“兔葵燕麦”真实获得 CNKGraph 字词证据。FastAPI 和 Streamlit 均可正常启动。尚未验证 CNKGraph 长期稳定性、并发负载或移动设备实机体验。
 
 ### 2026-06-20 CNKGraph Tool Layer v0.1
 
