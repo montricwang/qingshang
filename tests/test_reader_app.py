@@ -5,7 +5,9 @@ from apps.reader_app import (
     _group_tool_errors,
     _poem_label,
     _strip_trailing_pause,
+    bounded_line_index,
     build_breathing_fragments,
+    flatten_poem_lines,
 )
 
 
@@ -129,3 +131,19 @@ def test_breathing_fragments_keep_closing_marks_with_the_pause() -> None:
 
     assert [item["text"] for item in fragments] == ["「前句，」", "后句。」"]
     assert fragments[1]["indent_level"] == 1
+
+
+def test_flatten_poem_lines_preserves_section_order() -> None:
+    sections = [
+        {"lines": [{"global_line_no": 1, "text": "上片。"}]},
+        {"lines": [{"global_line_no": 2, "text": "下片。"}]},
+    ]
+
+    assert [line["global_line_no"] for line in flatten_poem_lines(sections)] == [1, 2]
+
+
+def test_bounded_line_index_stops_at_poem_edges() -> None:
+    assert bounded_line_index(0, -1, 3) == 0
+    assert bounded_line_index(0, 1, 3) == 1
+    assert bounded_line_index(2, 1, 3) == 2
+    assert bounded_line_index(0, 1, 0) == 0

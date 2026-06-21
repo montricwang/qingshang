@@ -1,4 +1,4 @@
-"""清商 Reader v0.1.8：本地词作阅读与手动 CNKGraph 辅助。"""
+"""清商 Reader v0.1.9：本地词作阅读与手动 CNKGraph 辅助。"""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import base64
 import html
 import os
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, TypedDict
@@ -24,6 +25,8 @@ HARD_STOPS = {"。", "！", "？", "；", "："}
 BREATHING_STOPS = SOFT_STOPS | HARD_STOPS
 CLOSING_MARKS = {"”", "’", "」", "』", "》", "）", "】"}
 FULL_WIDTH_INDENT = "　　"
+READING_MODES = ("通读", "慢读", "转轮", "领读")
+SPEED_SECONDS = {"快": 2.5, "中": 4.0, "慢": 6.0}
 
 TOOL_LABELS = {
     "allusion": "典故候选",
@@ -232,6 +235,18 @@ def build_breathing_fragments(
         section_fragments.append(fragments)
 
     return section_fragments
+
+
+def flatten_poem_lines(sections: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """按 section 与句序展开原始 poem_line，供转轮和领读定位。"""
+    return [line for section in sections for line in section.get("lines", [])]
+
+
+def bounded_line_index(current: int, delta: int, line_count: int) -> int:
+    """在词作句子范围内移动当前索引。"""
+    if line_count <= 0:
+        return 0
+    return min(max(current + delta, 0), line_count - 1)
 
 
 def fetch_reading_aids(
@@ -511,6 +526,47 @@ def install_styles(theme_name: str) -> None:
             color: var(--qs-accent) !important;
             box-shadow: inset 2px 0 0 var(--qs-accent);
         }
+        [class*="st-key-line-overview-"] button,
+        [class*="st-key-line-overview-"] button p {
+            justify-content: center;
+            text-align: center;
+        }
+        .focus-reader {
+            min-height: 18rem;
+            padding: 2.5rem 0 1.5rem;
+        }
+        .focus-context {
+            color: var(--qs-text-muted);
+            font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
+            min-height: 3.2rem;
+            opacity: 0.38;
+            padding: 0.85rem 1rem;
+            text-align: center;
+        }
+        .focus-position {
+            color: var(--qs-text-muted);
+            font-size: 0.75rem;
+            margin: 0.7rem 0;
+            text-align: center;
+        }
+        [class*="st-key-focus-current-"] button {
+            animation: qs-focus-in 220ms ease-out;
+            background: var(--qs-accent-soft) !important;
+            border-color: transparent !important;
+            color: var(--qs-text) !important;
+            font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
+            font-size: 1.2rem;
+            justify-content: center;
+            min-height: 4.4rem;
+            padding: 1rem 1.4rem;
+            text-align: center;
+        }
+        [class*="st-key-focus-current-"] button p { text-align: center; }
+        [class*="st-key-focus-nav-"] button { min-height: 2.25rem; }
+        @keyframes qs-focus-in {
+            from { opacity: 0.45; }
+            to { opacity: 1; }
+        }
         @media (max-width: 900px) {
             .block-container { padding-left: 1rem; padding-right: 1rem; }
             .reader-hero { height: 128px; padding: 22px; background-position: 56% center; }
@@ -529,7 +585,7 @@ def render_hero() -> None:
         f"""
         <div class="reader-hero" style="background-image: url('data:image/webp;base64,{encoded}')">
             <div class="reader-brand">清商</div>
-            <div class="reader-version">Reader v0.1.8 · 周邦彦词作</div>
+            <div class="reader-version">Reader v0.1.9 · 周邦彦词作</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -552,6 +608,9 @@ def choose_poem(poem_id: str) -> None:
     st.session_state.selected_line_text = None
     st.session_state.reading_aids = None
     st.session_state.last_included_tools = None
+    st.session_state.current_line_index = 0
+    st.session_state.is_playing = False
+    st.session_state.last_advance_at = time.monotonic()
 
 
 def choose_line(line_no: int, text: str) -> None:
@@ -561,6 +620,34 @@ def choose_line(line_no: int, text: str) -> None:
     st.session_state.selected_line_text = text
     st.session_state.reading_aids = None
     st.session_state.last_included_tools = None
+
+
+def change_reading_mode() -> None:
+    """切换阅读模式时停止自动推进，并从当前索引继续。"""
+    st.session_state.is_playing = False
+    st.session_state.last_advance_at = time.monotonic()
+
+
+def move_focus_line(delta: int, line_count: int) -> None:
+    """手动移动转轮当前句，并重置领读计时。"""
+    st.session_state.current_line_index = bounded_line_index(
+        st.session_state.current_line_index,
+        delta,
+        line_count,
+    )
+    st.session_state.last_advance_at = time.monotonic()
+
+
+def toggle_guided_playback(line_count: int) -> None:
+    """切换领读播放状态；在末句重新播放时回到开头。"""
+    if not st.session_state.is_playing and st.session_state.current_line_index >= line_count - 1:
+        st.session_state.current_line_index = 0
+    st.session_state.is_playing = not st.session_state.is_playing
+    st.session_state.last_advance_at = time.monotonic()
+
+
+def reset_guided_clock() -> None:
+    st.session_state.last_advance_at = time.monotonic()
 
 
 def reset_directory_page() -> None:
@@ -630,8 +717,159 @@ def render_poem_directory(poems: list[dict[str, Any]]) -> None:
             st.sidebar.caption(_strip_trailing_pause(opening_lines[poem_id]))
 
 
+def render_section_break(section_index: int) -> None:
+    if section_index:
+        st.markdown("<div class='section-break'></div>", unsafe_allow_html=True)
+
+
+def render_overview_mode(poem: dict[str, Any]) -> None:
+    """居中展示完整原始词句，适合连续通读。"""
+    for section_index, section in enumerate(poem.get("sections", [])):
+        render_section_break(section_index)
+        for line in section.get("lines", []):
+            line_no = line["global_line_no"]
+            line_text = line["text"]
+            selected = (
+                line_no == st.session_state.selected_line_no
+                and line_text == st.session_state.selected_line_text
+            )
+            st.button(
+                line_text,
+                key=f"line-overview-{poem['poem_id']}-{line_no}",
+                type="primary" if selected else "secondary",
+                use_container_width=True,
+                on_click=choose_line,
+                args=(line_no, line_text),
+            )
+
+
+def render_slow_mode(poem: dict[str, Any]) -> None:
+    """按句读分片与全角空格缩进展示慢读正文。"""
+    sections = build_breathing_fragments(poem.get("sections", []))
+    for section_index, fragments in enumerate(sections):
+        render_section_break(section_index)
+        for fragment in fragments:
+            selected = (
+                fragment["line_no"] == st.session_state.selected_line_no
+                and fragment["text"] == st.session_state.selected_line_text
+            )
+            st.button(
+                fragment["display_text"],
+                key=(
+                    f"line-fragment-{poem['poem_id']}-{fragment['line_no']}"
+                    f"-{fragment['fragment_no']}"
+                ),
+                type="primary" if selected else "secondary",
+                use_container_width=True,
+                on_click=choose_line,
+                args=(fragment["line_no"], fragment["text"]),
+            )
+
+
+def render_focus_reader(
+    lines: list[dict[str, Any]],
+    *,
+    key_prefix: str,
+    show_playback: bool,
+) -> None:
+    """突出当前原始词句，并以低透明度提供上下文。"""
+    if not lines:
+        return
+
+    line_count = len(lines)
+    current_index = bounded_line_index(
+        st.session_state.current_line_index,
+        0,
+        line_count,
+    )
+    st.session_state.current_line_index = current_index
+    current_line = lines[current_index]
+    previous_text = lines[current_index - 1]["text"] if current_index else ""
+    next_text = lines[current_index + 1]["text"] if current_index + 1 < line_count else ""
+
+    st.markdown(
+        f"<div class='focus-context'>{html.escape(previous_text) or '&nbsp;'}</div>",
+        unsafe_allow_html=True,
+    )
+    st.button(
+        current_line["text"],
+        key=f"focus-current-{key_prefix}-{current_index}",
+        type="primary",
+        use_container_width=True,
+        on_click=choose_line,
+        args=(current_line["global_line_no"], current_line["text"]),
+    )
+    st.markdown(
+        f"<div class='focus-context'>{html.escape(next_text) or '&nbsp;'}</div>",
+        unsafe_allow_html=True,
+    )
+
+    previous_column, center_column, next_column = st.columns([1, 1, 1])
+    previous_column.button(
+        "上一句",
+        key=f"focus-nav-{key_prefix}-previous",
+        disabled=current_index == 0,
+        use_container_width=True,
+        on_click=move_focus_line,
+        args=(-1, line_count),
+    )
+    if show_playback:
+        center_column.button(
+            "暂停" if st.session_state.is_playing else "播放",
+            key=f"focus-nav-{key_prefix}-play",
+            use_container_width=True,
+            on_click=toggle_guided_playback,
+            args=(line_count,),
+        )
+    else:
+        center_column.markdown(
+            f"<div class='focus-position'>{current_index + 1} / {line_count}</div>",
+            unsafe_allow_html=True,
+        )
+    next_column.button(
+        "下一句",
+        key=f"focus-nav-{key_prefix}-next",
+        disabled=current_index >= line_count - 1,
+        use_container_width=True,
+        on_click=move_focus_line,
+        args=(1, line_count),
+    )
+    if show_playback:
+        st.markdown(
+            f"<div class='focus-position'>{current_index + 1} / {line_count}</div>",
+            unsafe_allow_html=True,
+        )
+
+
+@st.fragment(run_every=0.5)
+def render_guided_mode(lines: list[dict[str, Any]]) -> None:
+    """局部计时推进领读当前句，不触发整页重跑。"""
+    now = time.monotonic()
+    if st.session_state.is_playing:
+        interval = SPEED_SECONDS[st.session_state.speed]
+        if now - st.session_state.last_advance_at >= interval:
+            next_index = bounded_line_index(
+                st.session_state.current_line_index,
+                1,
+                len(lines),
+            )
+            if next_index == st.session_state.current_line_index:
+                st.session_state.is_playing = False
+            else:
+                st.session_state.current_line_index = next_index
+            st.session_state.last_advance_at = now
+
+    st.segmented_control(
+        "速度",
+        options=list(SPEED_SECONDS),
+        key="speed",
+        on_change=reset_guided_clock,
+    )
+    render_focus_reader(lines, key_prefix="guided", show_playback=True)
+
+
 def render_poem(poem: dict[str, Any]) -> None:
-    """展示词作元数据、题序、分片和可点击词句。"""
+    """展示词作元数据，并按当前阅读模式渲染可点击正文。"""
     title = poem.get("title")
     heading = html.escape(poem.get("tune_name") or "未题词牌")
     if title:
@@ -653,26 +891,21 @@ def render_poem(poem: dict[str, Any]) -> None:
             unsafe_allow_html=True,
         )
 
-    sections = build_breathing_fragments(poem.get("sections", []))
-    for section_index, fragments in enumerate(sections):
-        if section_index:
-            st.markdown("<div class='section-break'></div>", unsafe_allow_html=True)
-        for fragment in fragments:
-            selected = (
-                fragment["line_no"] == st.session_state.selected_line_no
-                and fragment["text"] == st.session_state.selected_line_text
-            )
-            st.button(
-                fragment["display_text"],
-                key=(
-                    f"line-fragment-{poem['poem_id']}-{fragment['line_no']}"
-                    f"-{fragment['fragment_no']}"
-                ),
-                type="primary" if selected else "secondary",
-                use_container_width=True,
-                on_click=choose_line,
-                args=(fragment["line_no"], fragment["text"]),
-            )
+    reading_mode = st.segmented_control(
+        "阅读模式",
+        options=list(READING_MODES),
+        key="reading_mode",
+        on_change=change_reading_mode,
+    )
+    lines = flatten_poem_lines(poem.get("sections", []))
+    if reading_mode == "通读":
+        render_overview_mode(poem)
+    elif reading_mode == "慢读":
+        render_slow_mode(poem)
+    elif reading_mode == "转轮":
+        render_focus_reader(lines, key_prefix="wheel", show_playback=False)
+    else:
+        render_guided_mode(lines)
 
     if poem.get("source"):
         st.caption(f"文本来源：{poem['source']}")
@@ -908,6 +1141,11 @@ def initialize_state(poems: list[dict[str, Any]]) -> None:
     st.session_state.setdefault("reading_aids", None)
     st.session_state.setdefault("last_included_tools", None)
     st.session_state.setdefault("directory_page", 0)
+    st.session_state.setdefault("reading_mode", "慢读")
+    st.session_state.setdefault("current_line_index", 0)
+    st.session_state.setdefault("is_playing", False)
+    st.session_state.setdefault("speed", "中")
+    st.session_state.setdefault("last_advance_at", time.monotonic())
 
 
 def main() -> None:
