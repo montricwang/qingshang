@@ -1,10 +1,11 @@
-"""清商 Reader v0.1.5：本地词作阅读与手动 CNKGraph 辅助。"""
+"""清商 Reader v0.1.6：本地词作阅读与手动 CNKGraph 辅助。"""
 
 from __future__ import annotations
 
 import base64
 import html
 import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,41 @@ TOOL_LABELS = {
     "char": "字词释义",
     "rhyme": "韵部",
     "ci_tune": "词谱 / 平仄",
+}
+
+THEME_PALETTES = {
+    "浅色": {
+        "app_bg": "#f5f4f0",
+        "sidebar_bg": "#e8ebe7",
+        "surface": "#fbfbf8",
+        "surface_muted": "#eeefeb",
+        "text": "#27302c",
+        "text_muted": "#69716c",
+        "border": "#c9cfca",
+        "border_soft": "#dde1dd",
+        "accent": "#85554a",
+        "accent_hover": "#72483f",
+        "accent_soft": "#eaded9",
+        "green": "#526d62",
+        "hero_tint": "#f5f4f0",
+        "hero_blend": "normal",
+    },
+    "深色": {
+        "app_bg": "#1d2421",
+        "sidebar_bg": "#242c28",
+        "surface": "#29312d",
+        "surface_muted": "#313934",
+        "text": "#e7e4dc",
+        "text_muted": "#aab1ac",
+        "border": "#4b5650",
+        "border_soft": "#3a443f",
+        "accent": "#bd8b7e",
+        "accent_hover": "#c99a8d",
+        "accent_soft": "#493a35",
+        "green": "#8ca99d",
+        "hero_tint": "#354039",
+        "hero_blend": "multiply",
+    },
 }
 
 
@@ -80,6 +116,30 @@ def fetch_poem(poem_id: str) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_opening_lines(poem_ids: tuple[str, ...]) -> dict[str, str]:
+    """并发读取当前目录页无标题词作的起句，不改变列表接口。"""
+
+    def fetch_one(poem_id: str) -> tuple[str, str | None]:
+        try:
+            response = httpx.get(
+                _api_url(f"/api/poems/{poem_id}"),
+                timeout=API_TIMEOUT_SECONDS,
+            )
+            data = _response_json(response)
+        except (httpx.RequestError, ReaderAPIError):
+            return poem_id, None
+
+        sections = data.get("sections", []) if isinstance(data, dict) else []
+        lines = sections[0].get("lines", []) if sections else []
+        opening = lines[0].get("text") if lines else None
+        return poem_id, opening
+
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        results = executor.map(fetch_one, poem_ids)
+    return {poem_id: opening for poem_id, opening in results if opening}
+
+
 def fetch_reading_aids(
     poem_id: str,
     selected_text: str,
@@ -104,15 +164,20 @@ def fetch_reading_aids(
     return data if isinstance(data, dict) else {}
 
 
-def install_styles() -> None:
+def install_styles(theme_name: str) -> None:
     """应用 Reader 的稳定布局和领域视觉样式。"""
+    palette = THEME_PALETTES[theme_name]
+    variables = "\n".join(
+        f"--qs-{name.replace('_', '-')}: {value};" for name, value in palette.items()
+    )
     st.markdown(
-        """
-        <style>
-        .stApp { background: #f7f8f6; color: #202824; }
+        """<style>"""
+        + f":root {{ {variables} }}"
+        + """
+        .stApp { background: var(--qs-app-bg); color: var(--qs-text); }
         [data-testid="stSidebar"] {
-            background: #e9eeeb;
-            border-right: 1px solid #c9d1cd;
+            background: var(--qs-sidebar-bg);
+            border-right: 1px solid var(--qs-border);
         }
         [data-testid="stSidebar"] [data-testid="stButton"] button {
             min-height: 2.7rem;
@@ -121,6 +186,10 @@ def install_styles() -> None:
             border-radius: 4px;
             letter-spacing: 0;
         }
+        [data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
+            color: var(--qs-text-muted);
+            margin: -0.35rem 0 0.55rem 0.35rem;
+        }
         .block-container {
             max-width: 1480px;
             padding-top: 1.25rem;
@@ -128,9 +197,11 @@ def install_styles() -> None:
         }
         .reader-hero {
             height: 148px;
+            background-color: var(--qs-hero-tint);
+            background-blend-mode: var(--qs-hero-blend);
             background-size: cover;
             background-position: center;
-            border: 1px solid #c9c1ae;
+            border: 1px solid var(--qs-border);
             border-radius: 6px;
             margin-bottom: 1.2rem;
             padding: 28px 36px;
@@ -139,7 +210,7 @@ def install_styles() -> None:
             justify-content: center;
         }
         .reader-brand {
-            color: #26332d;
+            color: var(--qs-text);
             font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
             font-size: 2.25rem;
             font-weight: 700;
@@ -147,77 +218,144 @@ def install_styles() -> None:
             letter-spacing: 0;
         }
         .reader-version {
-            color: #6c5147;
+            color: var(--qs-accent);
             font-size: 0.8rem;
             margin-top: 0.55rem;
             letter-spacing: 0;
         }
         .poem-heading {
-            border-bottom: 1px solid #cbd2ce;
+            border-bottom: 1px solid var(--qs-border);
             padding: 0.25rem 0 1rem;
             margin-bottom: 1.2rem;
         }
         .poem-tune {
-            color: #202824;
+            color: var(--qs-text);
             font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
             font-size: 1.75rem;
             font-weight: 700;
             line-height: 1.25;
             letter-spacing: 0;
         }
-        .poem-meta { color: #6b746f; font-size: 0.9rem; margin-top: 0.45rem; }
+        .poem-title { color: var(--qs-text-muted); font-weight: 400; }
+        .poem-meta { color: var(--qs-text-muted); font-size: 0.9rem; margin-top: 0.45rem; }
         .poem-preface {
-            color: #535e58;
+            color: var(--qs-text-muted);
             font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
             line-height: 1.9;
             padding: 0.7rem 0;
         }
         .section-label {
-            color: #7e3430;
+            color: var(--qs-accent);
             font-size: 0.78rem;
             font-weight: 700;
             margin: 1.1rem 0 0.4rem;
             letter-spacing: 0;
         }
         .evidence-card {
-            background: #ffffff;
-            border: 1px solid #cdd5d1;
-            border-left: 3px solid #54766a;
+            background: var(--qs-surface);
+            border: 1px solid var(--qs-border);
+            border-left: 3px solid var(--qs-green);
             border-radius: 5px;
             padding: 0.85rem 0.95rem;
             margin: 0.55rem 0;
             overflow-wrap: anywhere;
         }
-        .evidence-anchor { color: #8a3832; font-size: 0.78rem; font-weight: 700; }
-        .evidence-title { color: #202824; font-weight: 700; margin: 0.25rem 0; }
-        .evidence-body { color: #39443f; font-size: 0.9rem; line-height: 1.65; }
+        .evidence-anchor { color: var(--qs-accent); font-size: 0.78rem; font-weight: 700; }
+        .evidence-title { color: var(--qs-text); font-weight: 700; margin: 0.25rem 0; }
+        .evidence-body { color: var(--qs-text); font-size: 0.9rem; line-height: 1.65; }
         .evidence-source {
-            color: #76817b;
-            border-top: 1px solid #e3e7e5;
+            color: var(--qs-text-muted);
+            border-top: 1px solid var(--qs-border-soft);
             font-size: 0.75rem;
             margin-top: 0.6rem;
             padding-top: 0.5rem;
         }
         .empty-state {
-            color: #78827d;
-            border: 1px dashed #c7cfcb;
+            color: var(--qs-text-muted);
+            border: 1px dashed var(--qs-border);
             border-radius: 5px;
             padding: 0.9rem;
             margin: 0.5rem 0;
         }
         .future-slot {
-            background: #eef1ef;
-            border: 1px solid #d0d7d3;
+            background: var(--qs-surface-muted);
+            border: 1px solid var(--qs-border);
             border-radius: 5px;
-            color: #626d67;
+            color: var(--qs-text-muted);
             padding: 0.75rem 0.85rem;
             margin-top: 0.65rem;
             font-size: 0.83rem;
         }
-        .future-slot strong { color: #39453f; }
-        [data-testid="stForm"] { border-radius: 6px; border-color: #c9d1cd; }
-        [data-testid="stTabs"] button { letter-spacing: 0; }
-        [data-testid="stButton"] button { border-radius: 4px; letter-spacing: 0; }
+        .future-slot strong { color: var(--qs-text); }
+        .tool-status {
+            background: var(--qs-surface-muted);
+            border-left: 2px solid var(--qs-border);
+            color: var(--qs-text-muted);
+            font-size: 0.82rem;
+            margin: 0.5rem 0;
+            padding: 0.65rem 0.75rem;
+        }
+        .query-hint { color: var(--qs-text-muted); font-size: 0.78rem; margin: -0.35rem 0 0.8rem; }
+        [data-testid="stForm"] {
+            background: var(--qs-surface);
+            border-radius: 6px;
+            border-color: var(--qs-border);
+        }
+        [data-baseweb="input"], [data-baseweb="select"] > div {
+            background: var(--qs-surface) !important;
+            border-color: var(--qs-border) !important;
+            color: var(--qs-text) !important;
+        }
+        span[data-baseweb="tag"] {
+            background: var(--qs-accent-soft) !important;
+            color: var(--qs-accent) !important;
+        }
+        [data-testid="stTabs"] button {
+            color: var(--qs-text-muted);
+            letter-spacing: 0;
+        }
+        [data-testid="stTabs"] button[aria-selected="true"] {
+            color: var(--qs-accent);
+            border-bottom-color: var(--qs-accent);
+        }
+        [data-testid="stButton"] button,
+        [data-testid="stFormSubmitButton"] button {
+            background: transparent;
+            border-color: var(--qs-border);
+            border-radius: 4px;
+            color: var(--qs-text);
+            letter-spacing: 0;
+        }
+        button[kind="primary"], button[kind="primaryFormSubmit"] {
+            background: var(--qs-accent-soft) !important;
+            border-color: var(--qs-accent) !important;
+            color: var(--qs-accent) !important;
+        }
+        button[kind="primary"]:hover, button[kind="primaryFormSubmit"]:hover {
+            background: var(--qs-accent-soft) !important;
+            border-color: var(--qs-accent-hover) !important;
+            color: var(--qs-accent-hover) !important;
+        }
+        [class*="st-key-line-"] button {
+            background: transparent;
+            border-color: transparent;
+            color: var(--qs-text);
+            font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
+            font-size: 1rem;
+            font-weight: 400;
+            min-height: 2.65rem;
+            padding-left: 0.7rem;
+        }
+        [class*="st-key-line-"] button:hover {
+            background: var(--qs-surface-muted);
+            border-color: var(--qs-border);
+            color: var(--qs-text);
+        }
+        [class*="st-key-line-"] button[kind="primary"] {
+            background: var(--qs-accent-soft) !important;
+            border-color: transparent !important;
+            color: var(--qs-accent) !important;
+        }
         @media (max-width: 900px) {
             .block-container { padding-left: 1rem; padding-right: 1rem; }
             .reader-hero { height: 128px; padding: 22px; background-position: 56% center; }
@@ -236,7 +374,7 @@ def render_hero() -> None:
         f"""
         <div class="reader-hero" style="background-image: url('data:image/webp;base64,{encoded}')">
             <div class="reader-brand">清商</div>
-            <div class="reader-version">Reader v0.1.5 · 周邦彦词作</div>
+            <div class="reader-version">Reader v0.1.6 · 周邦彦词作</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -246,7 +384,9 @@ def render_hero() -> None:
 def _poem_label(poem: dict[str, Any]) -> str:
     title = poem.get("title")
     tune_name = poem.get("tune_name") or "未题词牌"
-    return f"{tune_name} · {title}" if title else tune_name
+    series_label = poem.get("series_label")
+    suffix = " · ".join(value for value in (title, series_label) if value)
+    return f"{tune_name} · {suffix}" if suffix else tune_name
 
 
 def choose_poem(poem_id: str) -> None:
@@ -256,6 +396,7 @@ def choose_poem(poem_id: str) -> None:
     st.session_state.selected_line_no = None
     st.session_state.selected_line_text = None
     st.session_state.reading_aids = None
+    st.session_state.last_included_tools = None
 
 
 def choose_line(line_no: int, text: str) -> None:
@@ -264,6 +405,7 @@ def choose_line(line_no: int, text: str) -> None:
     st.session_state.selected_line_no = line_no
     st.session_state.selected_line_text = text
     st.session_state.reading_aids = None
+    st.session_state.last_included_tools = None
 
 
 def reset_directory_page() -> None:
@@ -297,6 +439,8 @@ def render_poem_directory(poems: list[dict[str, Any]]) -> None:
     page = st.session_state.directory_page
     start = page * DIRECTORY_PAGE_SIZE
     visible_poems = filtered[start : start + DIRECTORY_PAGE_SIZE]
+    untitled_ids = tuple(poem["poem_id"] for poem in visible_poems if not poem.get("title"))
+    opening_lines = fetch_opening_lines(untitled_ids) if untitled_ids else {}
 
     st.sidebar.caption(f"{len(filtered)} 首 · 第 {page + 1}/{page_count} 页")
     previous_column, next_column = st.sidebar.columns(2)
@@ -327,6 +471,8 @@ def render_poem_directory(poems: list[dict[str, Any]]) -> None:
             on_click=choose_poem,
             args=(poem_id,),
         )
+        if not poem.get("title") and opening_lines.get(poem_id):
+            st.sidebar.caption(f"起句 · {opening_lines[poem_id]}")
 
 
 def render_poem(poem: dict[str, Any]) -> None:
@@ -334,7 +480,7 @@ def render_poem(poem: dict[str, Any]) -> None:
     title = poem.get("title")
     heading = html.escape(poem.get("tune_name") or "未题词牌")
     if title:
-        heading = f"{heading} <span style='color:#6f7773;font-weight:400'>· {html.escape(title)}</span>"
+        heading = f"{heading} <span class='poem-title'>· {html.escape(title)}</span>"
     meta = " · ".join(
         html.escape(str(value))
         for value in (poem.get("dynasty"), poem.get("author"), poem.get("musical_mode"))
@@ -436,14 +582,39 @@ def render_allusions(items: list[dict[str, Any]]) -> None:
         )
 
 
-def render_reading_results(data: dict[str, Any] | None) -> None:
+def _group_tool_errors(errors: list[str]) -> dict[str, list[str]]:
+    """按 reading-aids 使用的工具前缀整理局部错误。"""
+    grouped: dict[str, list[str]] = {}
+    for error in errors:
+        prefix, separator, detail = error.partition(":")
+        tool_name = prefix.split("[", 1)[0]
+        if separator and tool_name in TOOL_LABELS:
+            grouped.setdefault(tool_name, []).append(detail.strip())
+    return grouped
+
+
+def render_tool_status(tool_name: str, errors: list[str], has_items: bool) -> None:
+    """在对应工具分区内解释空结果或局部上游失败。"""
+    if not errors:
+        return
+    if all("HTTP 404" in error for error in errors):
+        message = "部分内容未匹配" if has_items else "暂无匹配结果"
+    else:
+        message = "部分查询暂不可用" if has_items else "CNKGraph 暂时无法完成此项查询"
+    st.markdown(
+        f"<div class='tool-status'>{TOOL_LABELS[tool_name]}：{message}</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def render_reading_results(
+    data: dict[str, Any] | None,
+    included_tools: list[str] | None,
+) -> None:
     """按工具类型展示窄模型字段，忽略 raw。"""
     if not data:
         st.markdown("<div class='empty-state'>尚未查询</div>", unsafe_allow_html=True)
         return
-
-    for error in data.get("errors", []):
-        st.warning(error)
 
     evidences = data.get("evidences", [])
     by_tool = {
@@ -451,18 +622,58 @@ def render_reading_results(data: dict[str, Any] | None) -> None:
         for tool_name in ("char", "reference", "ci_tune")
     }
     rhyme_items = (data.get("prosody") or {}).get("rhyme_info", [])
+    allusions = data.get("allusions", [])
+    errors_by_tool = _group_tool_errors(data.get("errors", []))
+    included = set(included_tools or TOOL_LABELS)
+
+    result_count = len(evidences) + len(rhyme_items) + len(allusions)
+    hard_error_tools = {
+        tool_name
+        for tool_name, errors in errors_by_tool.items()
+        if any("HTTP 404" not in error for error in errors)
+    }
+    if included and result_count == 0 and included.issubset(hard_error_tools):
+        st.error("本次所选工具均暂时不可用，正文仍可继续阅读。")
 
     tabs = st.tabs(["字词释义", "典故候选", "出处与化用", "韵部", "词谱 / 平仄"])
     with tabs[0]:
-        render_evidences(by_tool["char"])
+        if "char" not in included:
+            st.markdown("<div class='empty-state'>本次未查询</div>", unsafe_allow_html=True)
+        else:
+            render_tool_status("char", errors_by_tool.get("char", []), bool(by_tool["char"]))
+            render_evidences(by_tool["char"])
     with tabs[1]:
-        render_allusions(data.get("allusions", []))
+        if "allusion" not in included:
+            st.markdown("<div class='empty-state'>本次未查询</div>", unsafe_allow_html=True)
+        else:
+            render_tool_status("allusion", errors_by_tool.get("allusion", []), bool(allusions))
+            render_allusions(allusions)
     with tabs[2]:
-        render_evidences(by_tool["reference"])
+        if "reference" not in included:
+            st.markdown("<div class='empty-state'>本次未查询</div>", unsafe_allow_html=True)
+        else:
+            render_tool_status(
+                "reference",
+                errors_by_tool.get("reference", []),
+                bool(by_tool["reference"]),
+            )
+            render_evidences(by_tool["reference"])
     with tabs[3]:
-        render_evidences(rhyme_items)
+        if "rhyme" not in included:
+            st.markdown("<div class='empty-state'>本次未查询</div>", unsafe_allow_html=True)
+        else:
+            render_tool_status("rhyme", errors_by_tool.get("rhyme", []), bool(rhyme_items))
+            render_evidences(rhyme_items)
     with tabs[4]:
-        render_evidences(by_tool["ci_tune"])
+        if "ci_tune" not in included:
+            st.markdown("<div class='empty-state'>本次未查询</div>", unsafe_allow_html=True)
+        else:
+            render_tool_status(
+                "ci_tune",
+                errors_by_tool.get("ci_tune", []),
+                bool(by_tool["ci_tune"]),
+            )
+            render_evidences(by_tool["ci_tune"])
 
 
 def render_tools(poem: dict[str, Any]) -> None:
@@ -473,6 +684,10 @@ def render_tools(poem: dict[str, Any]) -> None:
             "选中文本",
             key="selected_text",
             placeholder="兔葵燕麦",
+        )
+        st.markdown(
+            "<div class='query-hint'>建议输入短语，如：章台、前度刘郎、兔葵燕麦。</div>",
+            unsafe_allow_html=True,
         )
         selected_labels = st.multiselect(
             "工具",
@@ -499,6 +714,7 @@ def render_tools(poem: dict[str, Any]) -> None:
                 else None
             )
             st.session_state.reading_aids = None
+            st.session_state.last_included_tools = selected_labels
             try:
                 with st.spinner("正在查询外部证据"):
                     st.session_state.reading_aids = fetch_reading_aids(
@@ -510,7 +726,10 @@ def render_tools(poem: dict[str, Any]) -> None:
             except ReaderAPIError as exc:
                 st.error(str(exc))
 
-    render_reading_results(st.session_state.get("reading_aids"))
+    render_reading_results(
+        st.session_state.get("reading_aids"),
+        st.session_state.get("last_included_tools"),
+    )
     st.markdown(
         "<div class='future-slot'><strong>AI 自动识别候选</strong><br>下一版本接入</div>",
         unsafe_allow_html=True,
@@ -528,6 +747,7 @@ def initialize_state(poems: list[dict[str, Any]]) -> None:
     st.session_state.setdefault("selected_line_no", None)
     st.session_state.setdefault("selected_line_text", None)
     st.session_state.setdefault("reading_aids", None)
+    st.session_state.setdefault("last_included_tools", None)
     st.session_state.setdefault("directory_page", 0)
 
 
@@ -537,7 +757,13 @@ def main() -> None:
         layout="wide",
         initial_sidebar_state="expanded",
     )
-    install_styles()
+    theme_name = st.sidebar.segmented_control(
+        "外观",
+        options=list(THEME_PALETTES),
+        default="浅色",
+        key="reader_theme",
+    )
+    install_styles(theme_name or "浅色")
 
     try:
         poems = fetch_poems()
