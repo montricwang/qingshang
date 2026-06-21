@@ -2,7 +2,7 @@
 
 > 更新日期：2026-06-21
 > 仓库基线：`main` / `c5e5160`
-> 当前工作区：Reader v0.1.7 前端细节修复，后端与数据库结构未改动
+> 当前工作区：Reader v0.1.8 正文句读排版与目录辅助标题调整，后端与数据库结构未改动
 
 ## 1. 当前代码现状
 
@@ -27,8 +27,21 @@ HTTP 请求
   -> JSON 响应
 ```
 
-当前包含 FastAPI 后端、Reader v0.1.7 Streamlit 前端、数据清洗/导入脚本和单元测试。
+当前包含 FastAPI 后端、Reader v0.1.8 Streamlit 前端、数据清洗/导入脚本和单元测试。
 当前没有用户系统、权限系统、Alembic 数据库迁移、Docker 配置或 CI。
+
+### 2026-06-21 Reader v0.1.8
+
+- 本轮只修改 Streamlit 展示逻辑；未修改后端、数据库、poem_lines 原文或 API 请求契约。
+- 正文行改为左对齐，并继续使用透明边框、浅色 hover 和浅赭选中状态。
+- 新增纯函数 `build_breathing_fragments()`，在展示层把每条 poem_line 按 `，、。！？；：` 拆成可点击慢读分片。
+- 每个 section 的缩进从 0 开始；软停顿后增加一级，硬停顿后归零，并支持同一句内多个逗号形成多级缩进。
+- 每级缩进只加在 `display_text` 前，由两个全角空格表示；分片 `text`、`source_line_text`、poem_lines 原文均保持不变。
+- 句末停顿后的闭合引号、书名号和括号保留在同一分片，避免闭合符号单独成行。
+- 点击分片时使用无缩进的 `text` 回填 `selected_text`，同时继续携带原始 `line_no` 供 reading-aids 定位。
+- 目录辅助标题移除“起句 ·”前缀，保留灰色并提高字号；末尾停顿标点清理规则保持不变。
+- 正文仍不显示片名和行号，仅以片间留白与淡分隔表示分片。
+- 新增跨行缩进、单行多逗号拆分、section 重置和闭合符号测试；`python -m compileall app apps scripts tests` 已通过，`python -m pytest -q` 已通过 20 项测试。
 
 ### 2026-06-21 Reader v0.1.7
 

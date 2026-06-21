@@ -1,4 +1,4 @@
-"""清商 Reader v0.1.7：本地词作阅读与手动 CNKGraph 辅助。"""
+"""清商 Reader v0.1.8：本地词作阅读与手动 CNKGraph 辅助。"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import os
 import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 import httpx
 import streamlit as st
@@ -19,6 +19,11 @@ DEFAULT_API_BASE_URL = "http://127.0.0.1:8000"
 API_TIMEOUT_SECONDS = 45.0
 DIRECTORY_PAGE_SIZE = 24
 TRAILING_PAUSE_PATTERN = re.compile(r"[，。！？；、：]+$")
+SOFT_STOPS = {"，", "、"}
+HARD_STOPS = {"。", "！", "？", "；", "："}
+BREATHING_STOPS = SOFT_STOPS | HARD_STOPS
+CLOSING_MARKS = {"”", "’", "」", "』", "》", "）", "】"}
+FULL_WIDTH_INDENT = "　　"
 
 TOOL_LABELS = {
     "allusion": "典故候选",
@@ -66,6 +71,17 @@ THEME_PALETTES = {
 
 class ReaderAPIError(RuntimeError):
     """表示 Reader 无法从本地 FastAPI 获得有效数据。"""
+
+
+class BreathingFragment(TypedDict):
+    """一段可点击的慢读文本及其原始词句定位。"""
+
+    line_no: int
+    fragment_no: int
+    text: str
+    display_text: str
+    indent_level: int
+    source_line_text: str
 
 
 def _api_url(path: str) -> str:
@@ -147,6 +163,77 @@ def _strip_trailing_pause(text: str) -> str:
     return TRAILING_PAUSE_PATTERN.sub("", text)
 
 
+def build_breathing_fragments(
+    sections: list[dict[str, Any]],
+) -> list[list[BreathingFragment]]:
+    """按句读拆出慢读分片，并在每个 section 内维护视觉缩进。"""
+    section_fragments: list[list[BreathingFragment]] = []
+
+    for section in sections:
+        indent_level = 0
+        fragments: list[BreathingFragment] = []
+
+        for line in section.get("lines", []):
+            line_no = line["global_line_no"]
+            source_line_text = line["text"]
+            buffer = ""
+            fragment_no = 0
+            pending_stop: str | None = None
+
+            for char_index, char in enumerate(source_line_text):
+                buffer += char
+                next_char = (
+                    source_line_text[char_index + 1]
+                    if char_index + 1 < len(source_line_text)
+                    else None
+                )
+                if char in BREATHING_STOPS:
+                    pending_stop = char
+                is_fragment_end = bool(
+                    pending_stop
+                    and (
+                        char in BREATHING_STOPS
+                        and next_char not in BREATHING_STOPS | CLOSING_MARKS
+                        or char in CLOSING_MARKS
+                        and next_char not in CLOSING_MARKS
+                    )
+                )
+                if not is_fragment_end:
+                    continue
+
+                fragment_no += 1
+                fragments.append(
+                    BreathingFragment(
+                        line_no=line_no,
+                        fragment_no=fragment_no,
+                        text=buffer,
+                        display_text=f"{FULL_WIDTH_INDENT * indent_level}{buffer}",
+                        indent_level=indent_level,
+                        source_line_text=source_line_text,
+                    )
+                )
+                buffer = ""
+                indent_level = indent_level + 1 if pending_stop in SOFT_STOPS else 0
+                pending_stop = None
+
+            if buffer:
+                fragment_no += 1
+                fragments.append(
+                    BreathingFragment(
+                        line_no=line_no,
+                        fragment_no=fragment_no,
+                        text=buffer,
+                        display_text=f"{FULL_WIDTH_INDENT * indent_level}{buffer}",
+                        indent_level=indent_level,
+                        source_line_text=source_line_text,
+                    )
+                )
+
+        section_fragments.append(fragments)
+
+    return section_fragments
+
+
 def fetch_reading_aids(
     poem_id: str,
     selected_text: str,
@@ -196,12 +283,12 @@ def install_styles(theme_name: str) -> None:
         }
         [data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
             color: var(--qs-text-muted);
-            font-size: 0.7rem;
-            line-height: 1.25;
-            margin: -0.32rem 0 0.18rem 0.3rem;
+            font-size: 0.78rem;
+            line-height: 1.3;
+            margin: -0.34rem 0 0.14rem 0.3rem;
         }
         [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
-            gap: 0.4rem;
+            gap: 0.34rem;
         }
         [class*="st-key-directory-"] button {
             min-height: 1.95rem !important;
@@ -405,6 +492,13 @@ def install_styles(theme_name: str) -> None:
             font-weight: 400;
             min-height: 2.55rem;
             padding-left: 0.7rem;
+            justify-content: flex-start;
+            text-align: left;
+        }
+        [class*="st-key-line-"] button p {
+            text-align: left;
+            white-space: pre-wrap;
+            width: 100%;
         }
         [class*="st-key-line-"] button:hover {
             background: var(--qs-surface-muted);
@@ -415,6 +509,7 @@ def install_styles(theme_name: str) -> None:
             background: var(--qs-accent-soft) !important;
             border-color: transparent !important;
             color: var(--qs-accent) !important;
+            box-shadow: inset 2px 0 0 var(--qs-accent);
         }
         @media (max-width: 900px) {
             .block-container { padding-left: 1rem; padding-right: 1rem; }
@@ -434,7 +529,7 @@ def render_hero() -> None:
         f"""
         <div class="reader-hero" style="background-image: url('data:image/webp;base64,{encoded}')">
             <div class="reader-brand">清商</div>
-            <div class="reader-version">Reader v0.1.7 · 周邦彦词作</div>
+            <div class="reader-version">Reader v0.1.8 · 周邦彦词作</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -532,7 +627,7 @@ def render_poem_directory(poems: list[dict[str, Any]]) -> None:
             args=(poem_id,),
         )
         if not poem.get("title") and opening_lines.get(poem_id):
-            st.sidebar.caption(f"起句 · {_strip_trailing_pause(opening_lines[poem_id])}")
+            st.sidebar.caption(_strip_trailing_pause(opening_lines[poem_id]))
 
 
 def render_poem(poem: dict[str, Any]) -> None:
@@ -558,20 +653,25 @@ def render_poem(poem: dict[str, Any]) -> None:
             unsafe_allow_html=True,
         )
 
-    for section_index, section in enumerate(poem.get("sections", [])):
+    sections = build_breathing_fragments(poem.get("sections", []))
+    for section_index, fragments in enumerate(sections):
         if section_index:
             st.markdown("<div class='section-break'></div>", unsafe_allow_html=True)
-        for line in section.get("lines", []):
-            line_no = line["global_line_no"]
-            line_text = line["text"]
-            selected = line_no == st.session_state.selected_line_no
+        for fragment in fragments:
+            selected = (
+                fragment["line_no"] == st.session_state.selected_line_no
+                and fragment["text"] == st.session_state.selected_line_text
+            )
             st.button(
-                line_text,
-                key=f"line-{poem['poem_id']}-{line_no}",
+                fragment["display_text"],
+                key=(
+                    f"line-fragment-{poem['poem_id']}-{fragment['line_no']}"
+                    f"-{fragment['fragment_no']}"
+                ),
                 type="primary" if selected else "secondary",
                 use_container_width=True,
                 on_click=choose_line,
-                args=(line_no, line_text),
+                args=(fragment["line_no"], fragment["text"]),
             )
 
     if poem.get("source"):

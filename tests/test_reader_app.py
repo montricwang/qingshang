@@ -5,6 +5,7 @@ from apps.reader_app import (
     _group_tool_errors,
     _poem_label,
     _strip_trailing_pause,
+    build_breathing_fragments,
 )
 
 
@@ -54,3 +55,77 @@ def test_strip_trailing_pause_only_removes_terminal_pause_marks() -> None:
     assert _strip_trailing_pause("知谁伴、名园露饮，") == "知谁伴、名园露饮"
     assert _strip_trailing_pause("《章台路》。") == "《章台路》"
     assert _strip_trailing_pause("“章台路。”") == "“章台路。”"
+
+
+def test_breathing_fragments_carry_indent_across_source_lines() -> None:
+    sections = [
+        {
+            "lines": [
+                {"global_line_no": 1, "text": "侵晨浅约宫黄，"},
+                {"global_line_no": 2, "text": "障风映袖，"},
+                {"global_line_no": 3, "text": "盈盈笑语。"},
+                {"global_line_no": 4, "text": "归来旧处。"},
+            ]
+        }
+    ]
+
+    fragments = build_breathing_fragments(sections)[0]
+
+    assert [item["display_text"] for item in fragments] == [
+        "侵晨浅约宫黄，",
+        "　　障风映袖，",
+        "　　　　盈盈笑语。",
+        "归来旧处。",
+    ]
+
+
+def test_breathing_fragments_split_multiple_commas_without_dirtying_text() -> None:
+    sections = [
+        {
+            "lines": [
+                {
+                    "global_line_no": 4,
+                    "text": "跳脱添金双腕重，琵琶破拨四弦悲。",
+                }
+            ]
+        }
+    ]
+
+    fragments = build_breathing_fragments(sections)[0]
+
+    assert [item["text"] for item in fragments] == [
+        "跳脱添金双腕重，",
+        "琵琶破拨四弦悲。",
+    ]
+    assert [item["display_text"] for item in fragments] == [
+        "跳脱添金双腕重，",
+        "　　琵琶破拨四弦悲。",
+    ]
+    assert all(item["line_no"] == 4 for item in fragments)
+
+
+def test_breathing_fragments_reset_indent_for_each_section() -> None:
+    sections = [
+        {"lines": [{"global_line_no": 1, "text": "前一片，"}]},
+        {"lines": [{"global_line_no": 2, "text": "后一片起句，"}]},
+    ]
+
+    fragments = build_breathing_fragments(sections)
+
+    assert fragments[0][0]["indent_level"] == 0
+    assert fragments[1][0]["indent_level"] == 0
+
+
+def test_breathing_fragments_keep_closing_marks_with_the_pause() -> None:
+    sections = [
+        {
+            "lines": [
+                {"global_line_no": 1, "text": "「前句，」后句。」"},
+            ]
+        }
+    ]
+
+    fragments = build_breathing_fragments(sections)[0]
+
+    assert [item["text"] for item in fragments] == ["「前句，」", "后句。」"]
+    assert fragments[1]["indent_level"] == 1
