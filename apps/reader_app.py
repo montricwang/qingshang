@@ -1,10 +1,11 @@
-"""清商 Reader v0.1.6：本地词作阅读与手动 CNKGraph 辅助。"""
+"""清商 Reader v0.1.7：本地词作阅读与手动 CNKGraph 辅助。"""
 
 from __future__ import annotations
 
 import base64
 import html
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,7 @@ HERO_IMAGE = PROJECT_ROOT / "apps/assets/reader-landscape.webp"
 DEFAULT_API_BASE_URL = "http://127.0.0.1:8000"
 API_TIMEOUT_SECONDS = 45.0
 DIRECTORY_PAGE_SIZE = 24
+TRAILING_PAUSE_PATTERN = re.compile(r"[，。！？；、：]+$")
 
 TOOL_LABELS = {
     "allusion": "典故候选",
@@ -140,6 +142,11 @@ def fetch_opening_lines(poem_ids: tuple[str, ...]) -> dict[str, str]:
     return {poem_id: opening for poem_id, opening in results if opening}
 
 
+def _strip_trailing_pause(text: str) -> str:
+    """只移除起句末尾连续出现的中文停顿标点。"""
+    return TRAILING_PAUSE_PATTERN.sub("", text)
+
+
 def fetch_reading_aids(
     poem_id: str,
     selected_text: str,
@@ -180,7 +187,8 @@ def install_styles(theme_name: str) -> None:
             border-right: 1px solid var(--qs-border);
         }
         [data-testid="stSidebar"] [data-testid="stButton"] button {
-            min-height: 2.7rem;
+            min-height: 2.15rem;
+            padding: 0.28rem 0.55rem;
             text-align: left;
             justify-content: flex-start;
             border-radius: 4px;
@@ -188,7 +196,17 @@ def install_styles(theme_name: str) -> None:
         }
         [data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
             color: var(--qs-text-muted);
-            margin: -0.35rem 0 0.55rem 0.35rem;
+            font-size: 0.7rem;
+            line-height: 1.25;
+            margin: -0.32rem 0 0.18rem 0.3rem;
+        }
+        [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
+            gap: 0.4rem;
+        }
+        [class*="st-key-directory-"] button {
+            min-height: 1.95rem !important;
+            padding-bottom: 0.15rem !important;
+            padding-top: 0.15rem !important;
         }
         .block-container {
             max-width: 1480px;
@@ -244,12 +262,11 @@ def install_styles(theme_name: str) -> None:
             line-height: 1.9;
             padding: 0.7rem 0;
         }
-        .section-label {
-            color: var(--qs-accent);
-            font-size: 0.78rem;
-            font-weight: 700;
-            margin: 1.1rem 0 0.4rem;
-            letter-spacing: 0;
+        .section-break {
+            background: var(--qs-border-soft);
+            height: 1px;
+            margin: 1.25rem 12% 0.75rem;
+            opacity: 0.4;
         }
         .evidence-card {
             background: var(--qs-surface);
@@ -300,14 +317,57 @@ def install_styles(theme_name: str) -> None:
             background: var(--qs-surface);
             border-radius: 6px;
             border-color: var(--qs-border);
+            color: var(--qs-text);
         }
-        [data-baseweb="input"], [data-baseweb="select"] > div {
-            background: var(--qs-surface) !important;
+        [data-testid="stTextInput"] [data-baseweb="input"],
+        [data-testid="stTextInput"] input,
+        [data-testid="stTextInput"] div,
+        [data-baseweb="select"] > div {
+            background-color: var(--qs-surface) !important;
+            color: var(--qs-text) !important;
+        }
+        [data-testid="stTextInput"] [data-baseweb="input"],
+        [data-baseweb="select"] > div {
+            border-color: var(--qs-border) !important;
+        }
+        [data-testid="stTextInput"] input::placeholder {
+            color: var(--qs-text-muted) !important;
+            opacity: 0.82;
+        }
+        [data-testid="stTextInput"]:focus-within [data-baseweb="input"],
+        [data-testid="stTextInput"] [data-baseweb="base-input"]:focus-within,
+        [data-baseweb="select"] > div:focus-within {
+            border-color: var(--qs-accent) !important;
+            box-shadow: 0 0 0 1px var(--qs-accent) !important;
+            outline: 1px solid var(--qs-accent) !important;
+            outline-offset: -1px;
+        }
+        [data-baseweb="popover"],
+        [data-baseweb="popover"] > div,
+        [data-baseweb="menu"],
+        [role="listbox"] {
+            background-color: var(--qs-surface) !important;
             border-color: var(--qs-border) !important;
             color: var(--qs-text) !important;
         }
-        span[data-baseweb="tag"] {
+        [data-baseweb="menu"] li,
+        [role="option"] {
+            background-color: var(--qs-surface) !important;
+            color: var(--qs-text) !important;
+        }
+        [data-baseweb="menu"] li:hover,
+        [role="option"]:hover {
+            background-color: var(--qs-surface-muted) !important;
+        }
+        [data-testid="stButtonGroup"] button[data-testid^="stBaseButton-pills"] {
+            background: var(--qs-surface-muted) !important;
+            border: 1px solid var(--qs-border) !important;
+            color: var(--qs-text-muted) !important;
+            min-height: 2rem;
+        }
+        [data-testid="stButtonGroup"] button[data-testid="stBaseButton-pillsActive"] {
             background: var(--qs-accent-soft) !important;
+            border-color: var(--qs-accent) !important;
             color: var(--qs-accent) !important;
         }
         [data-testid="stTabs"] button {
@@ -343,7 +403,7 @@ def install_styles(theme_name: str) -> None:
             font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
             font-size: 1rem;
             font-weight: 400;
-            min-height: 2.65rem;
+            min-height: 2.55rem;
             padding-left: 0.7rem;
         }
         [class*="st-key-line-"] button:hover {
@@ -374,7 +434,7 @@ def render_hero() -> None:
         f"""
         <div class="reader-hero" style="background-image: url('data:image/webp;base64,{encoded}')">
             <div class="reader-brand">清商</div>
-            <div class="reader-version">Reader v0.1.6 · 周邦彦词作</div>
+            <div class="reader-version">Reader v0.1.7 · 周邦彦词作</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -472,7 +532,7 @@ def render_poem_directory(poems: list[dict[str, Any]]) -> None:
             args=(poem_id,),
         )
         if not poem.get("title") and opening_lines.get(poem_id):
-            st.sidebar.caption(f"起句 · {opening_lines[poem_id]}")
+            st.sidebar.caption(f"起句 · {_strip_trailing_pause(opening_lines[poem_id])}")
 
 
 def render_poem(poem: dict[str, Any]) -> None:
@@ -498,18 +558,15 @@ def render_poem(poem: dict[str, Any]) -> None:
             unsafe_allow_html=True,
         )
 
-    for section in poem.get("sections", []):
-        section_name = section.get("section_name") or f"第 {section.get('section_no')} 片"
-        st.markdown(
-            f"<div class='section-label'>{html.escape(str(section_name))}</div>",
-            unsafe_allow_html=True,
-        )
+    for section_index, section in enumerate(poem.get("sections", [])):
+        if section_index:
+            st.markdown("<div class='section-break'></div>", unsafe_allow_html=True)
         for line in section.get("lines", []):
             line_no = line["global_line_no"]
             line_text = line["text"]
             selected = line_no == st.session_state.selected_line_no
             st.button(
-                f"{line_no:02d}　{line_text}",
+                line_text,
                 key=f"line-{poem['poem_id']}-{line_no}",
                 type="primary" if selected else "secondary",
                 use_container_width=True,
@@ -689,12 +746,14 @@ def render_tools(poem: dict[str, Any]) -> None:
             "<div class='query-hint'>建议输入短语，如：章台、前度刘郎、兔葵燕麦。</div>",
             unsafe_allow_html=True,
         )
-        selected_labels = st.multiselect(
+        selected_labels = st.pills(
             "工具",
             options=list(TOOL_LABELS),
+            selection_mode="multi",
             default=list(TOOL_LABELS),
             format_func=lambda key: TOOL_LABELS[key],
         )
+        selected_labels = list(selected_labels or [])
         submitted = st.form_submit_button(
             "查询阅读辅助",
             type="primary",

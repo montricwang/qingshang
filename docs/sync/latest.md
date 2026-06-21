@@ -2,7 +2,7 @@
 
 > 更新日期：2026-06-21
 > 仓库基线：`main` / `c5e5160`
-> 当前工作区：Reader v0.1.6 阅读体验调整，后端与数据库结构未改动
+> 当前工作区：Reader v0.1.7 前端细节修复，后端与数据库结构未改动
 
 ## 1. 当前代码现状
 
@@ -27,8 +27,19 @@ HTTP 请求
   -> JSON 响应
 ```
 
-当前包含 FastAPI 后端、Reader v0.1.6 Streamlit 前端、数据清洗/导入脚本和单元测试。
+当前包含 FastAPI 后端、Reader v0.1.7 Streamlit 前端、数据清洗/导入脚本和单元测试。
 当前没有用户系统、权限系统、Alembic 数据库迁移、Docker 配置或 CI。
+
+### 2026-06-21 Reader v0.1.7
+
+- 本轮只修改 Streamlit 前端样式和展示细节；未修改后端 API、数据库、CNKGraph Tool Layer 或 LLM 功能。
+- 深色模式完整覆盖检索输入框、placeholder、边框、focus、表单容器、pills 及 BaseWeb 弹出区域，避免白底回退。
+- 工具选择由可删除 chip 的 `st.multiselect` 改为原生多选 `st.pills`。
+- 左侧目录缩小按钮高度、条目间距、起句间距和分页按钮高度。
+- 起句只移除末尾连续的 `，。！？；、：`，保留中间标点以及末尾书名号、引号和括号。
+- 正文不再显示片段名称，片间仅保留极淡分隔；逐句继续可点击，但不再显示 `01`、`02` 等编号。
+- 点击正文句子仍会把完整原句和内部 `line_no` 回填到阅读辅助表单。
+- 新增起句尾标点测试；`python -m compileall app apps scripts tests` 已通过，`python -m pytest -q` 已通过 16 项测试。
 
 ### 2026-06-21 Reader v0.1.6
 

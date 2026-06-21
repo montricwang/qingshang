@@ -1,6 +1,11 @@
 """覆盖 Reader 中不依赖浏览器的展示整理逻辑。"""
 
-from apps.reader_app import _card_html, _group_tool_errors, _poem_label
+from apps.reader_app import (
+    _card_html,
+    _group_tool_errors,
+    _poem_label,
+    _strip_trailing_pause,
+)
 
 
 def test_group_tool_errors_keeps_each_error_in_its_tool() -> None:
@@ -42,3 +47,10 @@ def test_evidence_card_escapes_external_text() -> None:
 
     assert "&lt;章台&gt;" in card
     assert "<章台>" not in card
+
+
+def test_strip_trailing_pause_only_removes_terminal_pause_marks() -> None:
+    assert _strip_trailing_pause("还见褪粉梅梢，。") == "还见褪粉梅梢"
+    assert _strip_trailing_pause("知谁伴、名园露饮，") == "知谁伴、名园露饮"
+    assert _strip_trailing_pause("《章台路》。") == "《章台路》"
+    assert _strip_trailing_pause("“章台路。”") == "“章台路。”"
