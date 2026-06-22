@@ -11,6 +11,8 @@ from apps.reader_app import (
     _group_tool_errors,
     _long_evidence_entries,
     _poem_label,
+    _review_evidence_html,
+    _review_result_html,
     _strip_trailing_pause,
     _truncate_evidence_text,
     bounded_line_index,
@@ -165,6 +167,34 @@ def test_candidate_selection_uses_anchor_not_query_variants() -> None:
     )
 
     assert payload == (12, "燕台句")
+
+
+def test_reader_review_displays_short_note_and_escapes_model_text() -> None:
+    summary = _review_result_html(
+        {
+            "review_status": "reviewed",
+            "confidence": "high",
+            "short_note": "<审阅短注>不是定论",
+            "caveat": "仍需人工确认<script>",
+        }
+    )
+    evidence = _review_evidence_html(
+        {
+            "title": "<玉台新咏序>",
+            "role": "prior_source",
+            "relevance": "strong",
+            "reason": "与原文短语相合<script>",
+            "query_used": "南都石黛",
+            "source_ref": "南朝 徐陵",
+        }
+    )
+
+    assert "审阅短注" in summary
+    assert "&lt;审阅短注&gt;" in summary
+    assert "<script>" not in summary
+    assert "前代来源" in evidence
+    assert "&lt;玉台新咏序&gt;" in evidence
+    assert "<script>" not in evidence
 
 
 def test_strip_trailing_pause_only_removes_terminal_pause_marks() -> None:

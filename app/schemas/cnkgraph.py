@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 RawCNKGraphData = dict[str, Any] | list[Any] | str | None
 ReadingAidKind = Literal["allusion", "reference", "char", "ci_tune", "rhyme"]
-EvidenceContextRelation = Literal["current_poem", "later_usage"]
+EvidenceContextRelation = Literal["prior_source", "current_poem", "later_usage"]
 RhymeChar = Annotated[str, Field(min_length=1, max_length=1)]
 
 

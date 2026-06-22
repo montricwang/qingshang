@@ -110,6 +110,8 @@ def _context_relation(
 
     source_rank = _dynasty_rank(source_ref)
     poem_rank = DYNASTY_ORDER.get(poem.dynasty)
+    if source_rank is not None and poem_rank is not None and source_rank < poem_rank:
+        return "prior_source"
     if source_rank is not None and poem_rank is not None and source_rank > poem_rank:
         return "later_usage"
     return None
@@ -117,7 +119,12 @@ def _context_relation(
 
 def _evidence_sort_key(item: EvidenceItem) -> tuple[int, int]:
     """有来源的普通候选优先，当前作品和后代用例靠后。"""
-    relation_rank = {None: 0, "later_usage": 2, "current_poem": 3}
+    relation_rank = {
+        "prior_source": 0,
+        None: 1,
+        "later_usage": 2,
+        "current_poem": 3,
+    }
     has_summary = bool(item.title and (item.claim or item.evidence_text or item.source_ref))
     return (relation_rank[item.context_relation], 0 if has_summary else 1)
 

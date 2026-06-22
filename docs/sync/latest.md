@@ -2,7 +2,7 @@
 
 > 更新日期：2026-06-22
 > 仓库基线：`main` / `c5e5160`
-> 当前工作区：Reader v0.1.12 Evidence Preview Polish，数据库结构未改动
+> 当前工作区：Reader v0.2.0 Evidence Review Annotation，数据库结构未改动
 
 ## 1. 当前代码现状
 
@@ -27,8 +27,23 @@ HTTP 请求
   -> JSON 响应
 ```
 
-当前包含 FastAPI 后端、Reader v0.1.11 Streamlit 前端、数据清洗/导入脚本和单元测试。
+当前包含 FastAPI 后端、Reader v0.2.0 Streamlit 前端、数据清洗/导入脚本和单元测试。
 当前没有用户系统、权限系统、Alembic 数据库迁移、Docker 配置或 CI。
+
+### 2026-06-22 Reader v0.2.0 / Evidence Review Annotation
+
+- 新增 `POST /api/poems/{poem_id}/allusion-candidates/with-review`；旧 `/allusion-candidates` 与 `/allusion-candidates/with-evidence` 继续保持原有用途和响应结构。
+- 新增 `app/services/allusion_evidence_reviewer.py`：先复用现有候选证据预览，再对每个候选单独调用受控 LLM Evidence Reviewer；单个候选失败只产生局部 `review_status=error`。
+- 新增 `EvidenceItemReview`、`EvidenceReviewResult`、`AllusionCandidateReviewedItem` 与 `AllusionCandidateReviewResponse`；Review 结果区分前代来源、当前作品自命中、后代沿用、弱相关、无关和关系不明。
+- Reviewer 只接收已由清商窄模型返回、实际可展示的 CNKGraph evidence，不接触 raw，不调用任何新检索工具，也不读取网页或本地 RAG。
+- prompt 明确 Reviewer 不是自由赏析者，不得 Web 搜索、凭记忆补出处或扩写知人论世；证据不足时必须返回 `insufficient_evidence/ambiguous`。
+- 程序按 `evidence_id + source + query_used + title` 核对模型引用；不存在于输入证据中的审阅条目会被过滤。
+- `current_poem` 强制转为 `current_work_self_hit`，`later_usage` 强制转为 `later_reuse`，两者均不能进入 `best_evidence`；只有 strong/medium 的 `prior_source` 可作为最佳证据。
+- 没有合格 `best_evidence` 或没有合规短注时，后端强制清空 `short_note` 并返回证据不足或有歧义；短注最多 240 字，仅为“审阅短注”，不是最终人工定论。
+- Reader 按候选展示中文类型、查询变体、Review 状态、置信度、审阅短注和最佳候选证据；降级/拒绝证据与原候选证据预览默认折叠，点击 anchor 仍只回填原文 `anchor_text`。
+- Reader 的 Review 请求使用独立的 180 秒默认超时（可由 `QINGSHANG_REVIEW_TIMEOUT_SECONDS` 调整）；目录、详情和手动工具仍使用原 45 秒超时，避免逐候选审阅被普通请求时限提前中断。
+- 未做 Web Search、Poetry RAG、CCPoem-Bert、知人论世扩展、Agent/LangGraph、数据库持久化或 ORM/schema 变更。
+- `.venv\Scripts\python.exe -m compileall app apps scripts tests` 已通过；`.venv\Scripts\python.exe -m pytest -q` 已通过 48 项测试。Starlette `TestClient/httpx` 弃用警告和 `.pytest_cache` 写权限警告不影响通过结果。
 
 ### 2026-06-22 Reader v0.1.12 / Evidence Preview Polish
 

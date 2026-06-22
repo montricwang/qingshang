@@ -19,6 +19,16 @@ Confidence = Literal["high", "medium", "low"]
 EvidenceStatus = Literal["hit", "no_result", "error"]
 OverallEvidenceStatus = Literal["hit", "no_result", "partial_error", "error"]
 EvidenceSource = Literal["cnkgraph_allusion", "cnkgraph_reference"]
+ReviewStatus = Literal["reviewed", "insufficient_evidence", "ambiguous", "error"]
+EvidenceReviewRole = Literal[
+    "prior_source",
+    "current_work_self_hit",
+    "later_reuse",
+    "weak_related",
+    "irrelevant",
+    "unknown",
+]
+EvidenceRelevance = Literal["strong", "medium", "weak", "none"]
 
 
 class AllusionCandidateItem(BaseModel):
@@ -88,4 +98,49 @@ class AllusionCandidateEvidenceResponse(BaseModel):
 
     poem_id: str
     items: list[AllusionCandidateEvidenceItem] = Field(default_factory=list, max_length=10)
+    errors: list[str] = Field(default_factory=list)
+
+
+class EvidenceItemReview(BaseModel):
+    """Reviewer 对一条实际候选证据的受控分类。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    evidence_id: str = Field(..., min_length=1)
+    source: str = Field(..., min_length=1)
+    query_used: str = Field(..., min_length=1)
+    title: str | None = None
+    source_ref: str | None = None
+    role: EvidenceReviewRole
+    relevance: EvidenceRelevance
+    reason: str = Field(..., min_length=1, max_length=240)
+
+
+class EvidenceReviewResult(BaseModel):
+    """单个候选的证据审阅结论，不表示最终人工确认。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    review_status: ReviewStatus
+    confidence: Confidence
+    short_note: str | None = Field(default=None, max_length=240)
+    best_evidence: list[EvidenceItemReview] = Field(default_factory=list)
+    downgraded_evidence: list[EvidenceItemReview] = Field(default_factory=list)
+    rejected_evidence: list[EvidenceItemReview] = Field(default_factory=list)
+    caveat: str | None = Field(default=None, max_length=240)
+
+
+class AllusionCandidateReviewedItem(AllusionCandidateEvidenceItem):
+    """候选、原候选证据与逐候选 Reviewer 结果。"""
+
+    review_result: EvidenceReviewResult
+
+
+class AllusionCandidateReviewResponse(BaseModel):
+    """整首词的候选证据审阅响应。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    poem_id: str
+    items: list[AllusionCandidateReviewedItem] = Field(default_factory=list, max_length=10)
     errors: list[str] = Field(default_factory=list)

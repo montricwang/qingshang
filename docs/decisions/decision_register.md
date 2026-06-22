@@ -130,16 +130,16 @@
 
 ## 5. Workflow / Agent 边界
 
-### D-011 候选识别后自动查证，但不自动解释
+### D-011 候选识别后自动查证并受控审阅，但不开放检索
 
-- **决策内容**：Reader 的“AI 识别并查证典故/化用候选”调用 `/allusion-candidates/with-evidence`，后端对每个候选最多取 3 个查询变体，自动调用现有 CNKGraph 典故与 reference 工具；用户仍可点击 anchor 回填 selected_text，并用 reading-aids 进一步手动查询。系统不做 LLM evidence review、综合解释或 Agent 编排。
+- **决策内容**：`/allusion-candidates/with-evidence` 继续提供未审阅的候选证据；v0.2.0 新增 `/allusion-candidates/with-review`，在同一固定 CNKGraph 证据集合上逐候选调用受控 Evidence Reviewer。用户仍可点击 anchor 回填 selected_text，并用 reading-aids 进一步手动查询；系统不做开放搜索、知人论世扩展或 Agent 编排。
 - **当时理由**：v0.1.10 的候选 pills 仍要求用户逐项复制/查询，无法直接判断候选是否有外部证据；固定的两工具查询矩阵可以补齐闭环，同时不把 query_variants 当成结论。
-- **当前收益**：候选、查询变体和 `hit/no_result/error` 在同一页面可见；404 与局部错误不会中断整首结果，证据只来自已有 CNKGraph 适配层。v0.1.12 将检索命中统一表述为“候选证据”，并标记、降权当前作品自命中以及可判断的后代用例，避免把命中误当成已确认解释。
-- **当前代价**：自动查证增加 CNKGraph 调用次数；上限为每首 10 个候选、每候选 3 个 query、每 query 2 个工具，即最多 60 次外部调用。当前仍无缓存、限流、并发控制或持久化，重复点击会重复请求。
+- **当前收益**：候选、查询变体和 `hit/no_result/error` 仍可追溯；Reviewer 可区分前代来源、自命中、后代沿用和弱/误命中，并只依据合格最佳证据生成一至两句“审阅短注”。检索命中和短注都不被表述为最终人工确认。
+- **当前代价**：除每首最多 60 次 CNKGraph 调用外，还可能增加最多 10 次逐候选 LLM Review；当前仍无缓存、限流、并发控制或持久化，重复点击会重复请求。
 - **风险等级**：medium
-- **重审条件**：出现明显延迟、限流或成本问题；准备公网开放；增加第三个自动工具；或计划让 LLM 自动评价、合并外部证据。
+- **重审条件**：出现明显延迟、限流或成本问题；准备公网开放；增加新数据源；或计划让审阅结果自动持久化、发布或替代人工确认。
 - **建议动作**：保留
-- **证据位置**：`app/services/allusion_evidence.py:build_allusion_evidence_preview()`、`app/api/routes/poems.py:read_allusion_candidates_with_evidence()`、`apps/reader_app.py:render_allusion_evidence_preview()/render_tools()`。
+- **证据位置**：`app/services/allusion_evidence.py:build_allusion_evidence_preview()`、`app/services/allusion_evidence_reviewer.py:build_allusion_evidence_review()`、`app/api/routes/poems.py`、`apps/reader_app.py:render_allusion_evidence_preview()/render_tools()`。
 
 ## 6. 前端框架与交互
 
@@ -249,3 +249,14 @@
 - **重审条件**：宣布 v0.2、准备发布、Reader 再增加主要工作流，或决定接入 AI 综合解释。
 - **建议动作**：保留
 - **证据位置**：`apps/reader_app.py:READING_MODES/render_tools()`、`docs/cnkgraph/integration_v0_1.md`、`docs/sync/latest.md` 各 v0.1.x 记录。
+
+### D-021 v0.2 只对封闭证据集做 LLM Review，仍保留人工确认
+
+- **决策内容**：v0.2.0 的 Evidence Reviewer 只能读取当前候选已有的 CNKGraph 窄证据，按稳定 ID 分类并生成最多一至两句审阅短注；不允许调用 Web Search、本地 Poetry RAG、知人论世资料或其他工具。Review 结果不是最终定论，也不自动持久化或发布。
+- **当时理由**：v0.1.12 已能展示候选证据，但用户仍需自行区分前代来源、当前作品自命中、后代沿用和误命中；这一判断适合受控审阅，却不需要开放式 Agent 或新增数据源。
+- **当前收益**：Reader 可直接展示 `reviewed/insufficient_evidence/ambiguous/error`、最佳/降级/拒绝证据和审阅短注；程序会过滤不存在于输入证据的引用，并禁止自命中与后代用例进入最佳证据。
+- **当前代价**：每首最多增加 10 次 LLM 调用；Reviewer 仍可能对现有证据相关性判断失误，且 CNKGraph 本身的漏检无法由封闭审阅补足。当前没有缓存、评测集或人工确认持久化。
+- **风险等级**：high
+- **重审条件**：短注准备面向公开用户发布、需要保存人工确认、Reviewer 质量无法由固定样例约束、需要引入第二证据源，或成本/延迟超过原型可接受范围。
+- **建议动作**：暂缓扩展
+- **证据位置**：`app/services/allusion_evidence_reviewer.py`、`app/schemas/allusion.py:EvidenceReviewResult`、`app/api/routes/poems.py:read_allusion_candidates_with_review()`、`tests/test_evidence_reviewer.py`。
