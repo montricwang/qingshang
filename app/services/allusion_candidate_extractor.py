@@ -25,12 +25,13 @@ REASON_TEMPLATES = {
 
 
 def build_allusion_candidate_prompt(poem: PoemModel) -> list[dict[str, str]]:
-    """生成只识别疑似典故、不负责解释出处的严格提示词。"""
+    """生成只识别完整可查单位、不负责解释出处的严格提示词。"""
     poem_text = build_poem_text_for_prompt(poem)
     system_prompt = (
         "你是宋词阅读中的典故候选识别器。"
         "只寻找疑似典故、用事、文献化用、历史地名、节令制度和固定文学传统。"
         "不要识别普通意象、主题词、佳句、情感表达或结构焦点。"
+        "这不是意象识别、赏析或主题词提取任务。"
         "不要解释典故，不要编造出处、书名、人物故事或历史事实。"
         "你只能说明某段原文为什么值得进一步检索。"
         "请输出严格 JSON，不要输出 Markdown 或额外说明。"
@@ -55,6 +56,7 @@ def build_allusion_candidate_prompt(poem: PoemModel) -> list[dict[str, str]]:
       "anchor_text": "逐字复制自对应原句的短语",
       "candidate_type": "allusion",
       "query": "适合后续检索的简短关键词",
+      "query_variants": ["原文锚点", "其他检索提示"],
       "reason": "只说明为什么疑似值得查，不给出未经证实的出处或故事",
       "confidence": "high"
     }}
@@ -76,7 +78,34 @@ candidate_type 只能是：
 4. 只有在它关联固定文学传统时才输出普通词语，并在 reason 中明确说明需查证的传统。
 5. 不确定时宁可省略；不得为了凑数量而输出。
 6. 不得声称候选出自某书、某诗或某人物故事；本步骤不做出处确认。
-7. 若没有候选，返回 {{"candidates": []}}。
+7. anchor_text 必须是“完整可查单位”，即能够让检索系统找到正确语义的最短原文片段。
+8. 如果相邻字会改变语义或避免常见误检，必须一起纳入 anchor_text；不能为了短而截断。
+9. query_variants 最多 4 个，第一项优先使用 anchor_text；它们只是查询提示，不是证据或事实断言。
+10. 若没有候选，返回 {{"candidates": []}}。
+
+完整可查单位正例：
+- 原句：吟笺赋笔，犹记燕台句。
+  anchor_text：燕台句
+  query_variants：["燕台句", "燕台诗", "李商隐 燕台诗"]
+  禁止输出：燕台
+- 原句：梨花榆火催寒食。
+  候选一 anchor_text：榆火
+  query_variants：["榆火", "榆火 寒食", "清明 赐火"]
+  候选二 anchor_text：寒食
+- 原句：长亭路，年去岁来，应折柔条过千尺。
+  anchor_text：折柔条
+  query_variants：["折柔条", "折柳送别", "折柳"]
+  禁止只输出：柔条
+- 原句：前度刘郎今又来。
+  anchor_text：前度刘郎
+  query_variants：["前度刘郎", "刘禹锡 前度刘郎"]
+  禁止只输出：刘郎
+
+反例：
+- 柳阴直：普通视觉起笔，不作为典故候选。
+- 京华倦客：主题性表达，不作为典故候选。
+- 斜阳冉冉春无极：佳句或评论焦点，不作为典故候选。
+- 沉思前事：情绪收束，不作为典故候选。
 """.strip()
     return [
         {"role": "system", "content": system_prompt},
@@ -97,9 +126,7 @@ def filter_allusion_candidates(
         for section in poem.sections
         for line in section.lines
     }
-    counts_by_line: dict[int, int] = defaultdict(int)
-    accepted: list[AllusionCandidateItem] = []
-    seen: set[tuple[int, str]] = set()
+    parsed: list[AllusionCandidateItem] = []
 
     for raw_candidate in raw_candidates:
         try:
@@ -109,15 +136,36 @@ def filter_allusion_candidates(
 
         # reason 只保留分类层面的“为何值得查”。模型提出的具体出处或人物故事
         # 尚未经过证据工具核验，不能直接进入 API 响应。
+        source_line = line_text_by_no.get(candidate.line_no)
+        if not source_line or candidate.anchor_text not in source_line:
+            continue
+
         candidate = candidate.model_copy(
-            update={"reason": REASON_TEMPLATES[candidate.candidate_type]}
+            update={
+                "line_text": source_line,
+                "reason": REASON_TEMPLATES[candidate.candidate_type],
+            }
+        )
+        parsed.append(candidate)
+
+    # 只处理同一句中差一两个字的明显截断关系，例如“燕台”/“燕台句”、
+    # “火”/“榆火”。较长的独立短语不会因此吞掉“寒食”等另一候选。
+    def is_truncated_by_more_specific(candidate: AllusionCandidateItem) -> bool:
+        return any(
+            other.line_no == candidate.line_no
+            and candidate.anchor_text != other.anchor_text
+            and candidate.anchor_text in other.anchor_text
+            and len(other.anchor_text) - len(candidate.anchor_text) <= 2
+            for other in parsed
         )
 
-        source_line = line_text_by_no.get(candidate.line_no)
+    counts_by_line: dict[int, int] = defaultdict(int)
+    accepted: list[AllusionCandidateItem] = []
+    seen: set[tuple[int, str]] = set()
+    for candidate in parsed:
         candidate_key = (candidate.line_no, candidate.anchor_text)
         if (
-            not source_line
-            or candidate.anchor_text not in source_line
+            is_truncated_by_more_specific(candidate)
             or counts_by_line[candidate.line_no] >= 2
             or candidate_key in seen
         ):

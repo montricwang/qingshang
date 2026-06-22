@@ -6,7 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.poem import get_poem_by_poem_id, list_poems
-from app.schemas.allusion import AllusionCandidateResponse
+from app.schemas.allusion import (
+    AllusionCandidateEvidenceResponse,
+    AllusionCandidateResponse,
+)
+from app.services.allusion_evidence import build_allusion_evidence_preview
 from app.schemas.poem import PoemCore, PoemListItem
 from app.services.allusion_candidate_extractor import extract_allusion_candidates
 from app.services.poem_analyzer import analyze_poem
@@ -98,4 +102,26 @@ async def read_allusion_candidates(
         raise HTTPException(
             status_code=500,
             detail=f"典故候选识别失败：{exc}",
+        ) from exc
+
+
+@router.post(
+    "/{poem_id}/allusion-candidates/with-evidence",
+    response_model=AllusionCandidateEvidenceResponse,
+)
+async def read_allusion_candidates_with_evidence(
+    poem_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> AllusionCandidateEvidenceResponse:
+    """识别整首词的典故候选，并用现有 CNKGraph 工具自动查证。"""
+    poem = await get_poem_by_poem_id(db=db, poem_id=poem_id)
+    if poem is None:
+        raise HTTPException(status_code=404, detail=f"找不到词作：{poem_id}")
+
+    try:
+        return await build_allusion_evidence_preview(poem)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"典故候选自动查证失败：{exc}",
         ) from exc

@@ -2,7 +2,7 @@
 
 > 更新日期：2026-06-22
 > 仓库基线：`main` / `c5e5160`
-> 当前工作区：Allusion Candidate Extractor 与 Reader v0.1.10，数据库结构未改动
+> 当前工作区：Reader v0.1.11 Allusion Evidence Preview，数据库结构未改动
 
 ## 1. 当前代码现状
 
@@ -27,8 +27,32 @@ HTTP 请求
   -> JSON 响应
 ```
 
-当前包含 FastAPI 后端、Reader v0.1.10 Streamlit 前端、数据清洗/导入脚本和单元测试。
+当前包含 FastAPI 后端、Reader v0.1.11 Streamlit 前端、数据清洗/导入脚本和单元测试。
 当前没有用户系统、权限系统、Alembic 数据库迁移、Docker 配置或 CI。
+
+### 2026-06-22 Reader v0.1.11 / Allusion Evidence Preview
+
+- 新增 `POST /api/poems/{poem_id}/allusion-candidates/with-evidence`；旧 `/allusion-candidates` 保持候选识别用途。
+- `AllusionCandidateItem` 新增可从上下文恢复的 `line_text` 与最多 4 个去重 `query_variants`；缺失时由 anchor/query 兜底。
+- prompt 将 anchor 定义为“完整可查单位 / 最小可消歧查询单位”，包含“燕台句、榆火、折柔条、前度刘郎”正例与普通意象/佳句反例。
+- 同一句中差一至两个字的明显截断候选优先保留较完整 anchor，例如“燕台句”覆盖“燕台”、“榆火”覆盖“火”；原有原文包含、每句 2 项、全词 10 项限制不变。
+- 新增 `app/services/allusion_evidence.py`：每个候选最多使用 3 个 query_variants，分别调用现有典故候选与 reference 工具；每个 query/source 独立返回 `hit/no_result/error`。
+- 上游 404 与空列表转换为 `no_result`，非 404 错误只影响当前查询；结果按来源和标题/来源/证据字段去重，预览不透传 CNKGraph raw。
+- Reader 按候选 expander 展示查询变体、总体状态、逐 source/query 状态及窄证据字段；点击 anchor 仍只回填原文 `anchor_text + line_no`。
+- `query_variants` 只是检索提示，不是证据结论；本轮不做 LLM evidence review、综合解释、Agent、外部网页搜索、缓存或数据库持久化。
+- 未接 CNKGraph labelize，未修改 poems/sections/lines、ORM、数据库结构或现有 reading-aids 接口。
+- `python -m compileall app apps scripts tests` 已通过；`python -m pytest -q` 已通过 34 项测试。测试产生 1 条 Starlette `TestClient/httpx` 弃用警告，不影响通过结果。
+- 真实《兰陵王·柳》自动查证返回 7 个候选；“隋堤、折柔条、榆火、寒食”等出现外部命中，`no_result` 候选也能独立呈现，整首请求无错误。
+- 真实《瑞龙吟》候选识别把“犹记燕台句”定位为 `anchor_text=燕台句`，未截断成“燕台”；query_variants 包含“燕台句”和“李商隐 燕台诗”等查询提示。
+- 浏览器验证 Reader 可展示候选 expander、查询变体、逐 source/query 状态、命中数与截断标记；点击“榆火”后 selected_text 只回填“榆火”。
+
+### 2026-06-22 设计取舍审计
+
+- 新增 `docs/decisions/decision_register.md`，按十个分类登记 20 项当前设计取舍、收益、代价、风险、重审条件和建议动作。
+- 新增 `docs/audits/current_decision_audit.md`，基于具体路由、函数、Schema 和 Reader 行为审计数据源、外部工具、LLM、前端、缓存、数据库、测试与版本范围。
+- 当前优先风险是文本来源治理、外部调用成本保护、无证据 `/analyze` 的产品定位、Alembic 缺失，以及数据库/API/领域质量测试不足。
+- 建议保留三层诗词结构、人工确认 workflow、Streamlit 薄客户端和 CNKGraph 适配分层；暂不接 Agent、labelize、自动综合解释或新数据库表。
+- 本轮只修改文档及 `.gitignore` 中两份治理文档的跟踪例外，没有修改 `app/`、`apps/`、`scripts/`、API、数据库结构或运行配置。
 
 ### 2026-06-22 Allusion Candidate Extractor
 

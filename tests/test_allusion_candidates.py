@@ -46,15 +46,21 @@ def candidate(
     line_no: int,
     anchor_text: str,
     candidate_type: str = "allusion",
+    *,
+    query: str | None = None,
+    query_variants: list[str] | None = None,
 ) -> dict[str, object]:
-    return {
+    result: dict[str, object] = {
         "line_no": line_no,
         "anchor_text": anchor_text,
         "candidate_type": candidate_type,
-        "query": anchor_text,
+        "query": query or anchor_text,
         "reason": "该短语可能带有固定文化语境，值得进一步查证。",
         "confidence": "medium",
     }
+    if query_variants is not None:
+        result["query_variants"] = query_variants
+    return result
 
 
 class AllusionCandidateFilterTests(TestCase):
@@ -66,6 +72,11 @@ class AllusionCandidateFilterTests(TestCase):
         self.assertIn("隋堤上", prompt)
         self.assertIn("不要识别普通意象", prompt)
         self.assertIn("不得声称候选出自某书", prompt)
+        self.assertIn("完整可查单位", prompt)
+        self.assertIn("anchor_text：燕台句", prompt)
+        self.assertIn('["燕台句", "燕台诗", "李商隐 燕台诗"]', prompt)
+        self.assertIn("禁止只输出：柔条", prompt)
+        self.assertIn("柳阴直：普通视觉起笔", prompt)
 
     def test_filter_rejects_bad_anchors_and_limits_each_line(self) -> None:
         raw = [
@@ -103,6 +114,65 @@ class AllusionCandidateFilterTests(TestCase):
         result = filter_allusion_candidates(raw, poem)
 
         self.assertEqual(len(result), 10)
+
+    def test_query_variants_are_deduplicated_and_limited(self) -> None:
+        raw = [
+            candidate(
+                2,
+                "隋堤",
+                "historical_place",
+                query="隋堤 送别",
+                query_variants=["隋堤", "隋堤", "隋堤 柳", "汴河 隋堤", "第五项"],
+            )
+        ]
+
+        result = filter_allusion_candidates(raw, make_poem())
+
+        self.assertEqual(
+            result[0].query_variants,
+            ["隋堤", "隋堤 柳", "汴河 隋堤", "第五项"],
+        )
+
+    def test_missing_query_variants_fall_back_to_anchor_and_query(self) -> None:
+        result = filter_allusion_candidates(
+            [candidate(2, "隋堤", "historical_place", query="隋堤 送别")],
+            make_poem(),
+        )
+
+        self.assertEqual(result[0].query_variants, ["隋堤", "隋堤 送别"])
+
+    def test_complete_lookup_unit_wins_over_truncated_anchor(self) -> None:
+        poem = make_poem()
+        poem.sections[0].lines[0].text = "吟笺赋笔，犹记燕台句。"
+        raw = [
+            candidate(1, "燕台", "historical_place"),
+            candidate(
+                1,
+                "燕台句",
+                "literary_reference",
+                query_variants=["燕台句", "燕台诗", "李商隐 燕台诗"],
+            ),
+        ]
+
+        result = filter_allusion_candidates(raw, poem)
+
+        self.assertEqual([item.anchor_text for item in result], ["燕台句"])
+        self.assertEqual(
+            result[0].query_variants,
+            ["燕台句", "燕台诗", "李商隐 燕台诗"],
+        )
+        self.assertEqual(result[0].line_text, "吟笺赋笔，犹记燕台句。")
+
+    def test_yu_fire_is_kept_as_the_complete_lookup_unit(self) -> None:
+        result = filter_allusion_candidates(
+            [
+                candidate(3, "火", "cultural_institution"),
+                candidate(3, "榆火", "cultural_institution"),
+            ],
+            make_poem(),
+        )
+
+        self.assertEqual([item.anchor_text for item in result], ["榆火"])
 
 
 class AllusionCandidateExtractorTests(IsolatedAsyncioTestCase):

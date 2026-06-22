@@ -101,4 +101,8 @@ class CNKGraphRouteTests(TestCase):
         self.assertIn("/api/cnkgraph/allusions", paths)
         self.assertIn("/api/cnkgraph/reference", paths)
         self.assertIn("/api/poems/{poem_id}/reading-aids", paths)
+        self.assertIn(
+            "/api/poems/{poem_id}/allusion-candidates/with-evidence",
+            paths,
+        )
         self.assertFalse(any("labelize" in path for path in paths))

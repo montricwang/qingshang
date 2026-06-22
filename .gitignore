@@ -5,4 +5,8 @@ __pycache__/
 qingshang.db
 data/generated/*_review.md
 AGENTS.md
-docs/
+docs/*
+!docs/decisions/
+!docs/decisions/decision_register.md
+!docs/audits/
+!docs/audits/current_decision_audit.md

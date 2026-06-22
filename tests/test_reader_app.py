@@ -1,7 +1,11 @@
 """覆盖 Reader 中不依赖浏览器的展示整理逻辑。"""
 
 from apps.reader_app import (
+    _all_candidates_have_no_evidence,
+    _candidate_selection_payload,
     _card_html,
+    _evidence_preview_html,
+    _evidence_status_text,
     _group_tool_errors,
     _poem_label,
     _strip_trailing_pause,
@@ -50,6 +54,53 @@ def test_evidence_card_escapes_external_text() -> None:
 
     assert "&lt;章台&gt;" in card
     assert "<章台>" not in card
+
+
+def test_candidate_evidence_preview_escapes_external_text() -> None:
+    preview = _evidence_preview_html(
+        {
+            "source": "cnkgraph_allusion",
+            "query_used": "<燕台句>",
+            "status": "hit",
+            "hit_count": 1,
+            "displayed_count": 1,
+            "truncated": False,
+            "items": [
+                {
+                    "title": "<燕台诗>",
+                    "claim": "候选<script>",
+                    "evidence_text": "引文",
+                    "source_ref": "来源",
+                }
+            ],
+        }
+    )
+
+    assert "&lt;燕台句&gt;" in preview
+    assert "&lt;燕台诗&gt;" in preview
+    assert "<script>" not in preview
+
+
+def test_candidate_evidence_status_copy_is_explicit() -> None:
+    assert _evidence_status_text("hit") == "命中"
+    assert _evidence_status_text("no_result") == "无结果"
+    assert _evidence_status_text("error") == "查询错误"
+    assert _evidence_status_text("partial_error", overall=True) == "部分查询失败"
+    assert _all_candidates_have_no_evidence(
+        [{"overall_status": "no_result"}, {"overall_status": "no_result"}]
+    )
+
+
+def test_candidate_selection_uses_anchor_not_query_variants() -> None:
+    payload = _candidate_selection_payload(
+        {
+            "line_no": 12,
+            "anchor_text": "燕台句",
+            "query_variants": ["燕台句", "燕台诗", "李商隐 燕台诗"],
+        }
+    )
+
+    assert payload == (12, "燕台句")
 
 
 def test_strip_trailing_pause_only_removes_terminal_pause_marks() -> None:
