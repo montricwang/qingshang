@@ -1,4 +1,4 @@
-"""清商 Reader v0.1.9：本地词作阅读与手动 CNKGraph 辅助。"""
+"""清商 Reader v0.1.10：本地词作阅读、典故候选与手动证据查询。"""
 
 from __future__ import annotations
 
@@ -269,6 +269,19 @@ def fetch_reading_aids(
         )
     except httpx.RequestError as exc:
         raise ReaderAPIError("阅读辅助请求失败，正文仍可继续阅读") from exc
+    data = _response_json(response)
+    return data if isinstance(data, dict) else {}
+
+
+def fetch_allusion_candidates(poem_id: str) -> dict[str, Any]:
+    """请求 LLM 识别整首词中值得进一步查证的典故候选。"""
+    try:
+        response = httpx.post(
+            _api_url(f"/api/poems/{poem_id}/allusion-candidates"),
+            timeout=API_TIMEOUT_SECONDS,
+        )
+    except httpx.RequestError as exc:
+        raise ReaderAPIError("典故候选识别请求失败，正文仍可继续阅读") from exc
     data = _response_json(response)
     return data if isinstance(data, dict) else {}
 
@@ -585,7 +598,7 @@ def render_hero() -> None:
         f"""
         <div class="reader-hero" style="background-image: url('data:image/webp;base64,{encoded}')">
             <div class="reader-brand">清商</div>
-            <div class="reader-version">Reader v0.1.9 · 周邦彦词作</div>
+            <div class="reader-version">Reader v0.1.10 · 周邦彦词作</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -608,6 +621,9 @@ def choose_poem(poem_id: str) -> None:
     st.session_state.selected_line_text = None
     st.session_state.reading_aids = None
     st.session_state.last_included_tools = None
+    st.session_state.allusion_candidates = None
+    st.session_state.allusion_candidate_error = None
+    st.session_state.pop("allusion_candidate_selection", None)
     st.session_state.current_line_index = 0
     st.session_state.is_playing = False
     st.session_state.last_advance_at = time.monotonic()
@@ -620,6 +636,21 @@ def choose_line(line_no: int, text: str) -> None:
     st.session_state.selected_line_text = text
     st.session_state.reading_aids = None
     st.session_state.last_included_tools = None
+
+
+def choose_allusion_candidate() -> None:
+    """把 AI 候选的原文锚点与行号交给现有手动阅读辅助表单。"""
+    selected = st.session_state.get("allusion_candidate_selection")
+    candidates = (st.session_state.get("allusion_candidates") or {}).get(
+        "candidates", []
+    )
+    if selected is None:
+        return
+    try:
+        candidate = candidates[int(selected)]
+    except (IndexError, TypeError, ValueError):
+        return
+    choose_line(candidate["line_no"], candidate["anchor_text"])
 
 
 def change_reading_mode() -> None:
@@ -1067,8 +1098,50 @@ def render_reading_results(
 
 
 def render_tools(poem: dict[str, Any]) -> None:
-    """展示手动工具表单、结果分区和下一版本占位区。"""
+    """展示 AI 候选入口、手动工具表单和证据结果。"""
     st.markdown("### 阅读辅助")
+    if st.button(
+        "AI 识别本词典故候选",
+        key=f"extract-allusions-{poem['poem_id']}",
+        use_container_width=True,
+    ):
+        st.session_state.allusion_candidates = None
+        st.session_state.allusion_candidate_error = None
+        st.session_state.pop("allusion_candidate_selection", None)
+        try:
+            with st.spinner("正在识别值得查证的典故候选"):
+                st.session_state.allusion_candidates = fetch_allusion_candidates(
+                    poem["poem_id"]
+                )
+        except ReaderAPIError as exc:
+            st.session_state.allusion_candidate_error = str(exc)
+
+    if st.session_state.allusion_candidate_error:
+        st.error(st.session_state.allusion_candidate_error)
+
+    candidates = (st.session_state.allusion_candidates or {}).get("candidates", [])
+    if st.session_state.allusion_candidates is not None and not candidates:
+        st.markdown(
+            "<div class='empty-state'>本词暂未识别到明确的典故候选</div>",
+            unsafe_allow_html=True,
+        )
+    elif candidates:
+        candidate_options = [str(index) for index in range(len(candidates))]
+        st.pills(
+            "AI 候选",
+            options=candidate_options,
+            key="allusion_candidate_selection",
+            format_func=lambda index: candidates[int(index)]["anchor_text"],
+            on_change=choose_allusion_candidate,
+        )
+        selected_candidate = st.session_state.get("allusion_candidate_selection")
+        if selected_candidate is not None:
+            candidate = candidates[int(selected_candidate)]
+            st.caption(
+                f"第 {candidate['line_no']} 句 · {candidate['candidate_type']} · "
+                f"{candidate['confidence']}：{candidate['reason']}"
+            )
+
     with st.form("reading-aids-form", border=True):
         selected_text = st.text_input(
             "选中文本",
@@ -1123,10 +1196,6 @@ def render_tools(poem: dict[str, Any]) -> None:
         st.session_state.get("last_included_tools"),
     )
     st.markdown(
-        "<div class='future-slot'><strong>AI 自动识别候选</strong><br>下一版本接入</div>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
         "<div class='future-slot'><strong>AI 综合解释</strong><br>下一版本接入</div>",
         unsafe_allow_html=True,
     )
@@ -1140,6 +1209,8 @@ def initialize_state(poems: list[dict[str, Any]]) -> None:
     st.session_state.setdefault("selected_line_text", None)
     st.session_state.setdefault("reading_aids", None)
     st.session_state.setdefault("last_included_tools", None)
+    st.session_state.setdefault("allusion_candidates", None)
+    st.session_state.setdefault("allusion_candidate_error", None)
     st.session_state.setdefault("directory_page", 0)
     st.session_state.setdefault("reading_mode", "慢读")
     st.session_state.setdefault("current_line_index", 0)

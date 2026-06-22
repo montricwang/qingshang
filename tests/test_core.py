@@ -59,6 +59,7 @@ class RouteTests(TestCase):
         paths = app.openapi()["paths"]
 
         self.assertIn("/api/poems", paths)
+        self.assertIn("/api/poems/{poem_id}/allusion-candidates", paths)
         self.assertNotIn("/api/poetry/explain", paths)
         self.assertNotIn("/api/chat/test", paths)
 

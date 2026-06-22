@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.poem import get_poem_by_poem_id, list_poems
+from app.schemas.allusion import AllusionCandidateResponse
 from app.schemas.poem import PoemCore, PoemListItem
+from app.services.allusion_candidate_extractor import extract_allusion_candidates
 from app.services.poem_analyzer import analyze_poem
 
 from app.db.session import get_db
@@ -75,3 +77,25 @@ async def analyze_poem_detail(
         ) from exc
 
     return analysis.model_dump(mode="json")
+
+
+@router.post(
+    "/{poem_id}/allusion-candidates",
+    response_model=AllusionCandidateResponse,
+)
+async def read_allusion_candidates(
+    poem_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> AllusionCandidateResponse:
+    """读取整首词，并让 LLM 识别值得后续查证的典故候选。"""
+    poem = await get_poem_by_poem_id(db=db, poem_id=poem_id)
+    if poem is None:
+        raise HTTPException(status_code=404, detail=f"找不到词作：{poem_id}")
+
+    try:
+        return await extract_allusion_candidates(poem)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"典故候选识别失败：{exc}",
+        ) from exc

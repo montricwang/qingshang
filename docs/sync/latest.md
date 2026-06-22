@@ -1,8 +1,8 @@
 # Qingshang 项目现状同步
 
-> 更新日期：2026-06-21
+> 更新日期：2026-06-22
 > 仓库基线：`main` / `c5e5160`
-> 当前工作区：Reader v0.1.9 四模式阅读界面，后端与数据库结构未改动
+> 当前工作区：Allusion Candidate Extractor 与 Reader v0.1.10，数据库结构未改动
 
 ## 1. 当前代码现状
 
@@ -27,8 +27,23 @@ HTTP 请求
   -> JSON 响应
 ```
 
-当前包含 FastAPI 后端、Reader v0.1.9 Streamlit 前端、数据清洗/导入脚本和单元测试。
+当前包含 FastAPI 后端、Reader v0.1.10 Streamlit 前端、数据清洗/导入脚本和单元测试。
 当前没有用户系统、权限系统、Alembic 数据库迁移、Docker 配置或 CI。
+
+### 2026-06-22 Allusion Candidate Extractor
+
+- 新增 `POST /api/poems/{poem_id}/allusion-candidates`：读取完整词作并调用现有 LLM，只返回值得后续查证的典故候选。
+- 新增 `app/schemas/allusion.py`，限制候选类型、置信度、必填字段和最多 10 项的响应契约。
+- 新增 `app/services/allusion_candidate_extractor.py`，负责窄提示词、严格 JSON 解析、候选结构校验及本地过滤。
+- 本地过滤保证 `anchor_text` 原样存在于对应原句；同句最多 2 项、全词最多 10 项，并去除重复锚点及无效类型。
+- API 将模型生成的自由理由归一为候选类型对应的谨慎模板，避免未经证据核验的书名、出处或人物故事进入响应。
+- 提示词明确排除普通意象、主题词、佳句、情感身份与结构焦点，也禁止模型编造出处、书名和人物故事。
+- Reader v0.1.10 右栏新增“AI 识别本词典故候选”按钮；候选以 pills 展示，点击后只回填原文锚点与 `line_no`。
+- 候选不会自动调用 CNKGraph、reading-aids 或生成综合解释；用户仍需手动选择现有工具查询证据。
+- 未新增数据库表，未修改 reading-aids 接口、CNKGraph Tool Layer、LLM client 或现有 poems 数据结构。
+- 新增 `tests/test_allusion_candidates.py`，覆盖提示词边界、原文锚点过滤、句级/全词数量上限和模拟 LLM JSON 解析。
+- `python -m compileall app apps scripts tests` 已通过；`python -m pytest -q` 已通过 26 项测试。
+- PostgreSQL 恢复后已真实调用《兰陵王·柳》；首轮命中“隋堤、折柔条、榆火/寒食”等重点且未输出指定普通句，但发现模型理由越界，已增加服务端理由归一化并再次复测。
 
 ### 2026-06-21 Reader v0.1.9
 
@@ -363,6 +378,7 @@ HTTP 请求
 | `GET` | `/api/poems` | 查询诗词列表 | Query：`author?: str`、`limit: 1..500 = 100`、`offset >= 0 = 0` | `PoemListItem[]`，包含 ID、作者、朝代、词牌、宫调、题名、套词标签等 |
 | `GET` | `/api/poems/{poem_id}` | 查询一首词的完整详情 | Path：稳定 `poem_id` | `PoemCore`，包含全文、题序、sections、lines、来源；不存在返回 404 |
 | `POST` | `/api/poems/{poem_id}/analyze` | 调用 LLM 生成结构化整首分析 | Path：`poem_id`；无 Body | JSON：摘要、情感流动、风格、意象、逐句翻译与解释；不存在返回 404，分析错误当前返回 500 |
+| `POST` | `/api/poems/{poem_id}/allusion-candidates` | 调用 LLM 识别整首词中的疑似典故候选 | Path：`poem_id`；无 Body | `poem_id` 与最多 10 个候选；每项包含原句行号、原文锚点、类型、检索词、疑似理由和置信度 |
 
 ### FastAPI 自动接口
 
