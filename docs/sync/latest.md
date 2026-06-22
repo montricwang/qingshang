@@ -2,7 +2,7 @@
 
 > 更新日期：2026-06-22
 > 仓库基线：`main` / `c5e5160`
-> 当前工作区：Reader v0.1.11 Allusion Evidence Preview，数据库结构未改动
+> 当前工作区：Reader v0.1.12 Evidence Preview Polish，数据库结构未改动
 
 ## 1. 当前代码现状
 
@@ -29,6 +29,20 @@ HTTP 请求
 
 当前包含 FastAPI 后端、Reader v0.1.11 Streamlit 前端、数据清洗/导入脚本和单元测试。
 当前没有用户系统、权限系统、Alembic 数据库迁移、Docker 配置或 CI。
+
+### 2026-06-22 Reader v0.1.12 / Evidence Preview Polish
+
+- 本轮只打磨 v0.1.11 的候选证据预览，不做 Evidence Review、最终短注、综合解释或新检索能力。
+- Reader 将“外部证据”统一收紧为“候选证据”，按钮改为“AI 识别并查证典故/化用候选”，并明确提示结果尚未审阅与当前词境的贴合度。
+- `candidate_type` 在 Reader 中映射为“典故、文献化用、历史地名、礼俗制度、惯用母题、待查”，不再直接展示英文枚举。
+- 候选理由继续由后端覆盖模型自由文本，并按六类候选使用不同的谨慎模板；prompt 进一步区分真实历史地名与“南都石黛”一类整体文献语词。
+- `EvidenceItem` 新增可选 `context_relation`；自动预览会保守标记“当前作品命中”和可明确判断的“后代用例”。有摘要的普通候选优先，后代用例和当前作品自命中靠后，避免用原句证明原句。
+- 每个候选先展示实际命中的结果；`no_result/error` 收入“查看无结果与错误”折叠入口，不再铺满右栏。
+- 长引文默认只展示最多 160 字摘要；完整原文放入“查看长引文”折叠入口，所有外部文本仍先做 HTML 转义。
+- 修复命中/展示/截断状态：只有 `displayed_count > 0` 且 `hit_count > displayed_count` 才标记“已截断”；命中但展示为 0 时显示“暂无可展示条目”。
+- query variants 仍只显示为“查询变体”，候选回填仍只使用原文 `anchor_text`；检索命中不被表述为已确认典故或解释。
+- 未修改数据库、ORM、poems 数据、旧候选接口用途、CNKGraph 数据源范围或 reading-aids 主链路。
+- `.venv\Scripts\python.exe -m compileall app apps scripts tests` 已通过；`.venv\Scripts\python.exe -m pytest -q` 已通过 41 项测试。测试仍有 Starlette `TestClient/httpx` 弃用警告；受当前目录权限影响，pytest 另报告无法写入 `.pytest_cache`，均不影响测试结果。
 
 ### 2026-06-22 Reader v0.1.11 / Allusion Evidence Preview
 

@@ -16,11 +16,11 @@ from app.services.poem_analyzer import build_poem_text_for_prompt, extract_json
 
 REASON_TEMPLATES = {
     "allusion": "该原文短语具有用事或典故化表达的可能，值得进一步查证。",
-    "literary_reference": "该原文短语可能涉及前代文献或文学语句的化用，值得进一步查证。",
-    "historical_place": "该地名可能承载超出字面地点的历史文化语境，值得进一步查证。",
-    "cultural_institution": "该原文短语可能涉及节令、礼俗、制度或文化名物，值得进一步查证。",
-    "conventional_motif": "该原文短语可能关联固定的文学表达传统，值得进一步查证。",
-    "uncertain": "该原文短语疑似具有字面意义之外的文化关联，但目前无法确定，值得进一步查证。",
+    "literary_reference": "该原文短语可能涉及前代文献语词、成句或诗文化用，值得进一步查证。",
+    "historical_place": "该地名或地点表达可能承载历史、文学或游冶空间语境，值得进一步查证。",
+    "cultural_institution": "该短语可能涉及节令、礼俗、制度或名物知识，值得进一步查证。",
+    "conventional_motif": "该表达可能属于固定文学母题或惯用传统，值得进一步查证。",
+    "uncertain": "该短语存在非字面解释的可能，但类型尚不明确，需进一步查证。",
 }
 
 
@@ -82,6 +82,7 @@ candidate_type 只能是：
 8. 如果相邻字会改变语义或避免常见误检，必须一起纳入 anchor_text；不能为了短而截断。
 9. query_variants 最多 4 个，第一项优先使用 anchor_text；它们只是查询提示，不是证据或事实断言。
 10. 若没有候选，返回 {{"candidates": []}}。
+11. historical_place 只用于原文确实以地点或地名为可查单位的情况；像“南都石黛”这样整体更像前代文献语词的短语，应优先考虑 literary_reference，不要只因其中含地名就分类为 historical_place。
 
 完整可查单位正例：
 - 原句：吟笺赋笔，犹记燕台句。

@@ -22,6 +22,22 @@ from app.services.cnkgraph_tools import (
 MAX_QUERIES_PER_CANDIDATE = 3
 MAX_DISPLAYED_PER_RESULT = 3
 
+DYNASTY_ORDER = {
+    "先秦": 1,
+    "秦": 2,
+    "汉": 3,
+    "魏晋": 4,
+    "南北朝": 5,
+    "隋": 6,
+    "唐": 7,
+    "五代": 8,
+    "宋": 9,
+    "元": 10,
+    "明": 11,
+    "清": 12,
+    "近现代": 13,
+}
+
 
 def _allusion_as_evidence(item: AllusionCandidate) -> EvidenceItem:
     """把典故候选转换为证据预览共用的窄字段，并丢弃 raw。"""
@@ -52,12 +68,85 @@ def _evidence_key(item: EvidenceItem) -> tuple[str, str, str]:
     )
 
 
+def _normalized_text(value: str | None) -> str:
+    """移除空白和常见停顿符，只用于保守比较作品文本。"""
+    if not value:
+        return ""
+    return "".join(
+        char for char in value if not char.isspace() and char not in "，。！？；、："
+    )
+
+
+def _dynasty_rank(source_ref: str | None) -> int | None:
+    """从清商窄来源字符串中识别少量常用朝代，不做复杂历史排序。"""
+    if not source_ref:
+        return None
+    for dynasty, rank in DYNASTY_ORDER.items():
+        if dynasty in source_ref:
+            return rank
+    return None
+
+
+def _context_relation(
+    item: EvidenceItem,
+    poem: PoemModel,
+    current_line_text: str,
+) -> str | None:
+    """保守标记当前作品自命中和可明确判断的后代用例。"""
+    source_ref = item.source_ref or ""
+    evidence_text = _normalized_text(item.evidence_text)
+    current_line = _normalized_text(current_line_text)
+    title_matches = any(
+        value and value in source_ref
+        for value in (poem.title, poem.tune_name)
+    )
+    line_matches = bool(
+        evidence_text
+        and current_line
+        and (evidence_text == current_line or evidence_text in current_line)
+    )
+    if poem.author in source_ref and (title_matches or line_matches):
+        return "current_poem"
+
+    source_rank = _dynasty_rank(source_ref)
+    poem_rank = DYNASTY_ORDER.get(poem.dynasty)
+    if source_rank is not None and poem_rank is not None and source_rank > poem_rank:
+        return "later_usage"
+    return None
+
+
+def _evidence_sort_key(item: EvidenceItem) -> tuple[int, int]:
+    """有来源的普通候选优先，当前作品和后代用例靠后。"""
+    relation_rank = {None: 0, "later_usage": 2, "current_poem": 3}
+    has_summary = bool(item.title and (item.claim or item.evidence_text or item.source_ref))
+    return (relation_rank[item.context_relation], 0 if has_summary else 1)
+
+
+def _annotate_and_sort_evidence(
+    items: list[EvidenceItem],
+    poem: PoemModel,
+    current_line_text: str,
+) -> list[EvidenceItem]:
+    """添加作品关系标记，并让自命中与后代用例排在普通候选之后。"""
+    annotated = [
+        item.model_copy(
+            update={
+                "context_relation": _context_relation(item, poem, current_line_text)
+            }
+        )
+        for item in items
+    ]
+    return sorted(annotated, key=_evidence_sort_key)
+
+
 async def _collect_evidence_result(
     *,
     source: EvidenceSource,
     query: str,
     operation: Awaitable[list[EvidenceItem] | list[AllusionCandidate]],
     seen: set[tuple[str, str, str]],
+    poem: PoemModel,
+    current_line_text: str,
 ) -> CandidateEvidenceResult:
     """执行一个 query/source，并把 404、空结果和局部错误稳定分类。"""
     try:
@@ -89,6 +178,12 @@ async def _collect_evidence_result(
         seen.add(key)
         unique_items.append(item)
 
+    unique_items = _annotate_and_sort_evidence(
+        unique_items,
+        poem,
+        current_line_text,
+    )
+
     hit_count = len(items)
     displayed = unique_items[:MAX_DISPLAYED_PER_RESULT]
     if hit_count == 0:
@@ -101,7 +196,7 @@ async def _collect_evidence_result(
         status=status,
         hit_count=hit_count,
         displayed_count=len(displayed),
-        truncated=hit_count > len(displayed),
+        truncated=bool(displayed) and hit_count > len(displayed),
         items=displayed,
     )
 
@@ -139,14 +234,23 @@ async def build_allusion_evidence_preview(
                 query=query,
                 operation=build_allusion_candidates(query),
                 seen=seen_by_source["cnkgraph_allusion"],
+                poem=poem,
+                current_line_text=candidate.line_text,
             )
             reference_result = await _collect_evidence_result(
                 source="cnkgraph_reference",
                 query=query,
                 operation=build_reference_evidences(query),
                 seen=seen_by_source["cnkgraph_reference"],
+                poem=poem,
+                current_line_text=candidate.line_text,
             )
             evidence_results.extend((allusion_result, reference_result))
+
+        # 先展示实际命中；空结果和局部错误保留，但不淹没候选证据。
+        evidence_results.sort(
+            key=lambda result: {"hit": 0, "no_result": 1, "error": 2}[result.status]
+        )
 
         for result in evidence_results:
             if result.status == "error" and result.error:

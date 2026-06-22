@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 RawCNKGraphData = dict[str, Any] | list[Any] | str | None
 ReadingAidKind = Literal["allusion", "reference", "char", "ci_tune", "rhyme"]
+EvidenceContextRelation = Literal["current_poem", "later_usage"]
 RhymeChar = Annotated[str, Field(min_length=1, max_length=1)]
 
 
@@ -22,6 +23,7 @@ class EvidenceItem(BaseModel):
     evidence_text: str | None = None
     source_ref: str | None = None
     match_status: Literal["exact", "candidate", "no_result", "error"] = "candidate"
+    context_relation: EvidenceContextRelation | None = None
     raw: RawCNKGraphData = None
 
 

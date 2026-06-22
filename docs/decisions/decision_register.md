@@ -132,9 +132,9 @@
 
 ### D-011 候选识别后自动查证，但不自动解释
 
-- **决策内容**：Reader 的“AI 识别并查证典故候选”调用 `/allusion-candidates/with-evidence`，后端对每个候选最多取 3 个查询变体，自动调用现有 CNKGraph 典故与 reference 工具；用户仍可点击 anchor 回填 selected_text，并用 reading-aids 进一步手动查询。系统不做 LLM evidence review、综合解释或 Agent 编排。
+- **决策内容**：Reader 的“AI 识别并查证典故/化用候选”调用 `/allusion-candidates/with-evidence`，后端对每个候选最多取 3 个查询变体，自动调用现有 CNKGraph 典故与 reference 工具；用户仍可点击 anchor 回填 selected_text，并用 reading-aids 进一步手动查询。系统不做 LLM evidence review、综合解释或 Agent 编排。
 - **当时理由**：v0.1.10 的候选 pills 仍要求用户逐项复制/查询，无法直接判断候选是否有外部证据；固定的两工具查询矩阵可以补齐闭环，同时不把 query_variants 当成结论。
-- **当前收益**：候选、查询变体和 `hit/no_result/error` 在同一页面可见；404 与局部错误不会中断整首结果，证据只来自已有 CNKGraph 适配层。
+- **当前收益**：候选、查询变体和 `hit/no_result/error` 在同一页面可见；404 与局部错误不会中断整首结果，证据只来自已有 CNKGraph 适配层。v0.1.12 将检索命中统一表述为“候选证据”，并标记、降权当前作品自命中以及可判断的后代用例，避免把命中误当成已确认解释。
 - **当前代价**：自动查证增加 CNKGraph 调用次数；上限为每首 10 个候选、每候选 3 个 query、每 query 2 个工具，即最多 60 次外部调用。当前仍无缓存、限流、并发控制或持久化，重复点击会重复请求。
 - **风险等级**：medium
 - **重审条件**：出现明显延迟、限流或成本问题；准备公网开放；增加第三个自动工具；或计划让 LLM 自动评价、合并外部证据。

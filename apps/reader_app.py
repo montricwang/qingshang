@@ -1,4 +1,4 @@
-"""清商 Reader v0.1.11：本地词作阅读与典故候选证据预览。"""
+"""清商 Reader v0.1.12：本地词作阅读与候选证据预览。"""
 
 from __future__ import annotations
 
@@ -41,16 +41,29 @@ EVIDENCE_SOURCE_LABELS = {
     "cnkgraph_reference": "CNKGraph 出处与化用",
 }
 EVIDENCE_STATUS_LABELS = {
-    "hit": "命中",
+    "hit": "命中候选证据",
     "no_result": "无结果",
     "error": "查询错误",
 }
 OVERALL_STATUS_LABELS = {
-    "hit": "查到外部证据",
-    "no_result": "未查到外部证据",
-    "partial_error": "部分查询失败",
-    "error": "查询失败",
+    "hit": "查到候选证据",
+    "no_result": "未查到候选证据",
+    "partial_error": "候选证据部分查询失败",
+    "error": "候选证据查询失败",
 }
+CANDIDATE_TYPE_LABELS = {
+    "allusion": "典故",
+    "literary_reference": "文献化用",
+    "historical_place": "历史地名",
+    "cultural_institution": "礼俗制度",
+    "conventional_motif": "惯用母题",
+    "uncertain": "待查",
+}
+EVIDENCE_CONTEXT_LABELS = {
+    "current_poem": "当前作品命中",
+    "later_usage": "后代用例",
+}
+EVIDENCE_EXCERPT_LIMIT = 160
 
 THEME_PALETTES = {
     "浅色": {
@@ -630,7 +643,7 @@ def render_hero() -> None:
         f"""
         <div class="reader-hero" style="background-image: url('data:image/webp;base64,{encoded}')">
             <div class="reader-brand">清商</div>
-            <div class="reader-version">Reader v0.1.11 · 周邦彦词作</div>
+            <div class="reader-version">Reader v0.1.12 · 周邦彦词作</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -993,6 +1006,34 @@ def _evidence_status_text(status: str, *, overall: bool = False) -> str:
     return labels.get(status, "状态未知")
 
 
+def _candidate_type_label(candidate_type: str) -> str:
+    """把稳定枚举转换为 Reader 使用的中文候选类型。"""
+    return CANDIDATE_TYPE_LABELS.get(candidate_type, "待查")
+
+
+def _truncate_evidence_text(
+    text: str | None,
+    limit: int = EVIDENCE_EXCERPT_LIMIT,
+) -> tuple[str, str | None]:
+    """返回默认摘要和可折叠全文；短文本不产生重复全文。"""
+    normalized = (text or "").strip()
+    if len(normalized) <= limit:
+        return normalized, None
+    return normalized[:limit].rstrip() + "…", normalized
+
+
+def _evidence_count_text(result: dict[str, Any]) -> str:
+    """生成不会把“展示 0”误称为截断的命中计数文案。"""
+    hit_count = int(result.get("hit_count") or 0)
+    displayed_count = int(result.get("displayed_count") or 0)
+    if hit_count > 0 and displayed_count == 0:
+        return f"命中 {hit_count} · 暂无可展示条目"
+    text = f"命中 {hit_count} · 展示 {displayed_count}"
+    if displayed_count > 0 and hit_count > displayed_count and result.get("truncated"):
+        text += " · 已截断"
+    return text
+
+
 def _evidence_preview_html(result: dict[str, Any]) -> str:
     """渲染一个 query/source 的窄证据，所有外部文本先做 HTML 转义。"""
     source = html.escape(
@@ -1000,16 +1041,13 @@ def _evidence_preview_html(result: dict[str, Any]) -> str:
     )
     query = html.escape(str(result.get("query_used") or ""))
     status = html.escape(_evidence_status_text(str(result.get("status") or "")))
-    hit_count = int(result.get("hit_count") or 0)
-    displayed_count = int(result.get("displayed_count") or 0)
-    truncated = " · 已截断" if result.get("truncated") else ""
+    count_text = html.escape(_evidence_count_text(result))
     parts = [
         "<div class='evidence-preview'>",
         f"<div class='evidence-preview-head'>{source} · {status}</div>",
         (
             "<div class='evidence-preview-meta'>"
-            f"查询：{query} · 命中 {hit_count} · 展示 {displayed_count}"
-            f"{truncated}</div>"
+            f"查询：{query} · {count_text}</div>"
         ),
     ]
     if result.get("error"):
@@ -1019,11 +1057,17 @@ def _evidence_preview_html(result: dict[str, Any]) -> str:
         )
     for item in result.get("items", []):
         title = html.escape(str(item.get("title") or "未命名候选"))
+        excerpt, full_text = _truncate_evidence_text(item.get("evidence_text"))
+        relation = EVIDENCE_CONTEXT_LABELS.get(str(item.get("context_relation") or ""))
+        relation_html = (
+            f"<br><strong>{html.escape(relation)}</strong>" if relation else ""
+        )
         details = "<br>".join(
             html.escape(str(value))
             for value in (
                 item.get("claim"),
-                item.get("evidence_text"),
+                f"命中片段：{item['anchor_text']}" if item.get("anchor_text") else None,
+                excerpt or None,
                 item.get("source_ref"),
             )
             if value
@@ -1031,10 +1075,22 @@ def _evidence_preview_html(result: dict[str, Any]) -> str:
         parts.append(
             "<div class='evidence-preview-item'>"
             f"<strong>{title}</strong>"
-            f"{'<br>' + details if details else ''}</div>"
+            f"{relation_html}"
+            f"{'<br>' + details if details else ''}"
+            f"{'<br><em>长引文已折叠</em>' if full_text else ''}</div>"
         )
     parts.append("</div>")
     return "".join(parts)
+
+
+def _long_evidence_entries(result: dict[str, Any]) -> list[tuple[str, str]]:
+    """收集需要由折叠控件展示的长引文。"""
+    entries: list[tuple[str, str]] = []
+    for item in result.get("items", []):
+        _, full_text = _truncate_evidence_text(item.get("evidence_text"))
+        if full_text:
+            entries.append((str(item.get("title") or "未命名候选"), full_text))
+    return entries
 
 
 def _all_candidates_have_no_evidence(candidates: list[dict[str, Any]]) -> bool:
@@ -1050,7 +1106,7 @@ def render_allusion_evidence_preview(
 ) -> None:
     """用可展开区域展示候选、查询变体和逐工具证据状态。"""
     if _all_candidates_have_no_evidence(candidates):
-        st.info("所有候选均未查到外部证据；候选仍可用于手动查询。")
+        st.info("所有候选均未查到外部候选证据；候选仍可用于手动查询。")
 
     for index, candidate in enumerate(candidates):
         anchor_text = str(candidate.get("anchor_text") or "未命名候选")
@@ -1069,22 +1125,36 @@ def render_allusion_evidence_preview(
             )
             st.caption(
                 f"第 {candidate.get('line_no')} 句 · "
-                f"{candidate.get('candidate_type')} · {candidate.get('confidence')}"
+                f"{_candidate_type_label(str(candidate.get('candidate_type') or ''))} · "
+                f"{candidate.get('confidence')}"
             )
             query_variants = candidate.get("query_variants") or []
             st.caption("查询变体：" + " · ".join(str(value) for value in query_variants))
             st.caption(str(candidate.get("reason") or ""))
+            st.caption("以下均为外部候选证据，尚未审阅与当前词境的贴合度。")
             results = candidate.get("evidence_results") or []
             if not results:
                 st.markdown(
-                    "<div class='empty-state'>尚无外部证据结果</div>",
+                    "<div class='empty-state'>尚无候选证据结果</div>",
                     unsafe_allow_html=True,
                 )
-            for result in results:
+            hit_results = [result for result in results if result.get("status") == "hit"]
+            other_results = [result for result in results if result.get("status") != "hit"]
+            for result in hit_results:
                 st.markdown(
                     _evidence_preview_html(result),
                     unsafe_allow_html=True,
                 )
+                for title, full_text in _long_evidence_entries(result):
+                    with st.popover(f"查看长引文 · {title}"):
+                        st.text(full_text)
+            if other_results:
+                with st.popover(f"查看无结果与错误 · {len(other_results)}"):
+                    for result in other_results:
+                        st.markdown(
+                            _evidence_preview_html(result),
+                            unsafe_allow_html=True,
+                        )
 
 
 def _card_html(
@@ -1246,7 +1316,7 @@ def render_tools(poem: dict[str, Any]) -> None:
     """展示 AI 候选入口、手动工具表单和证据结果。"""
     st.markdown("### 阅读辅助")
     if st.button(
-        "AI 识别并查证典故候选",
+        "AI 识别并查证典故/化用候选",
         key=f"extract-allusions-{poem['poem_id']}",
         use_container_width=True,
     ):
@@ -1254,7 +1324,7 @@ def render_tools(poem: dict[str, Any]) -> None:
         st.session_state.allusion_candidate_error = None
         st.session_state.pop("allusion_candidate_selection", None)
         try:
-            with st.spinner("正在识别候选并查询外部证据"):
+            with st.spinner("正在识别候选并查询外部候选证据"):
                 st.session_state.allusion_candidates = fetch_allusion_candidates(
                     poem["poem_id"]
                 )
@@ -1283,7 +1353,8 @@ def render_tools(poem: dict[str, Any]) -> None:
         if selected_candidate is not None:
             candidate = candidates[int(selected_candidate)]
             st.caption(
-                f"第 {candidate['line_no']} 句 · {candidate['candidate_type']} · "
+                f"第 {candidate['line_no']} 句 · "
+                f"{_candidate_type_label(str(candidate['candidate_type']))} · "
                 f"{candidate['confidence']}：{candidate['reason']}"
             )
         render_allusion_evidence_preview(poem["poem_id"], candidates)
@@ -1327,7 +1398,7 @@ def render_tools(poem: dict[str, Any]) -> None:
             st.session_state.reading_aids = None
             st.session_state.last_included_tools = selected_labels
             try:
-                with st.spinner("正在查询外部证据"):
+                with st.spinner("正在查询外部候选证据"):
                     st.session_state.reading_aids = fetch_reading_aids(
                         poem["poem_id"],
                         normalized_text,

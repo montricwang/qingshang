@@ -9,6 +9,10 @@ from app.db.session import get_db
 from app.main import app
 from app.schemas.allusion import AllusionCandidateItem, AllusionCandidateResponse
 from app.schemas.cnkgraph import AllusionCandidate, EvidenceItem
+from app.services.allusion_evidence import (
+    _annotate_and_sort_evidence,
+    _collect_evidence_result,
+)
 from app.services.cnkgraph_client import CNKGraphClientError
 
 
@@ -63,7 +67,13 @@ async def fake_reference_lookup(query: str) -> list[EvidenceItem]:
 
 
 def test_with_evidence_endpoint_keeps_local_errors_local() -> None:
-    poem = SimpleNamespace(poem_id="test-0001")
+    poem = SimpleNamespace(
+        poem_id="test-0001",
+        author="周邦彦",
+        dynasty="宋",
+        tune_name="瑞龙吟",
+        title=None,
+    )
 
     async def override_get_db():
         yield object()
@@ -112,3 +122,84 @@ def test_with_evidence_endpoint_keeps_local_errors_local() -> None:
     hit_item = data["items"][0]["evidence_results"][0]["items"][0]
     assert hit_item["title"] == "燕台诗候选"
     assert hit_item["raw"] is None
+
+
+async def _evidence_operation(count: int) -> list[EvidenceItem]:
+    return [
+        EvidenceItem(
+            tool_name="reference",
+            title=f"候选 {index}",
+            evidence_text=f"引文 {index}",
+            source_ref=f"唐 作者{index} 《作品{index}》",
+        )
+        for index in range(count)
+    ]
+
+
+def make_poem_context() -> SimpleNamespace:
+    return SimpleNamespace(
+        author="周邦彦",
+        dynasty="宋",
+        tune_name="瑞龙吟",
+        title=None,
+    )
+
+
+def test_current_poem_hit_is_marked_and_sorted_after_earlier_source() -> None:
+    items = [
+        EvidenceItem(
+            tool_name="reference",
+            title="瑞龙吟",
+            evidence_text="犹记燕台句。",
+            source_ref="宋 周邦彦 《瑞龙吟》",
+        ),
+        EvidenceItem(
+            tool_name="reference",
+            title="燕台诗",
+            evidence_text="前代来源候选",
+            source_ref="唐 李商隐 《燕台诗》",
+        ),
+        EvidenceItem(
+            tool_name="reference",
+            title="后代用例",
+            evidence_text="后代沿用候选",
+            source_ref="明 某作者 《某集》",
+        ),
+    ]
+
+    result = _annotate_and_sort_evidence(
+        items,
+        make_poem_context(),  # type: ignore[arg-type]
+        "犹记燕台句。",
+    )
+
+    assert [item.title for item in result] == ["燕台诗", "后代用例", "瑞龙吟"]
+    assert result[1].context_relation == "later_usage"
+    assert result[2].context_relation == "current_poem"
+
+
+def test_truncated_requires_at_least_one_displayed_item() -> None:
+    async def run_case(count: int, seen_all: bool):
+        items = await _evidence_operation(count)
+        seen = {
+            (item.title or "", item.source_ref or "", item.evidence_text or "")
+            for item in items
+        } if seen_all else set()
+        return await _collect_evidence_result(
+            source="cnkgraph_reference",
+            query="测试",
+            operation=_evidence_operation(count),
+            seen=seen,
+            poem=make_poem_context(),  # type: ignore[arg-type]
+            current_line_text="当前原句。",
+        )
+
+    import asyncio
+
+    one_hidden = asyncio.run(run_case(1, True))
+    nine_hidden = asyncio.run(run_case(9, True))
+    nine_visible = asyncio.run(run_case(9, False))
+
+    assert (one_hidden.hit_count, one_hidden.displayed_count, one_hidden.truncated) == (1, 0, False)
+    assert (nine_hidden.hit_count, nine_hidden.displayed_count, nine_hidden.truncated) == (9, 0, False)
+    assert (nine_visible.hit_count, nine_visible.displayed_count, nine_visible.truncated) == (9, 3, True)

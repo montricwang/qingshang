@@ -6,6 +6,7 @@ from unittest import IsolatedAsyncioTestCase, TestCase
 from unittest.mock import AsyncMock, patch
 
 from app.services.allusion_candidate_extractor import (
+    REASON_TEMPLATES,
     build_allusion_candidate_prompt,
     extract_allusion_candidates,
     filter_allusion_candidates,
@@ -64,6 +65,16 @@ def candidate(
 
 
 class AllusionCandidateFilterTests(TestCase):
+    def test_reason_templates_are_specific_to_candidate_type(self) -> None:
+        assert REASON_TEMPLATES == {
+            "allusion": "该原文短语具有用事或典故化表达的可能，值得进一步查证。",
+            "literary_reference": "该原文短语可能涉及前代文献语词、成句或诗文化用，值得进一步查证。",
+            "historical_place": "该地名或地点表达可能承载历史、文学或游冶空间语境，值得进一步查证。",
+            "cultural_institution": "该短语可能涉及节令、礼俗、制度或名物知识，值得进一步查证。",
+            "conventional_motif": "该表达可能属于固定文学母题或惯用传统，值得进一步查证。",
+            "uncertain": "该短语存在非字面解释的可能，但类型尚不明确，需进一步查证。",
+        }
+
     def test_prompt_draws_a_narrow_boundary(self) -> None:
         messages = build_allusion_candidate_prompt(make_poem())
         prompt = "\n".join(message["content"] for message in messages)
@@ -77,6 +88,7 @@ class AllusionCandidateFilterTests(TestCase):
         self.assertIn('["燕台句", "燕台诗", "李商隐 燕台诗"]', prompt)
         self.assertIn("禁止只输出：柔条", prompt)
         self.assertIn("柳阴直：普通视觉起笔", prompt)
+        self.assertIn("南都石黛", prompt)
 
     def test_filter_rejects_bad_anchors_and_limits_each_line(self) -> None:
         raw = [
@@ -93,7 +105,7 @@ class AllusionCandidateFilterTests(TestCase):
         self.assertEqual([item.anchor_text for item in result], ["隋堤", "送行色", "榆火"])
         self.assertTrue(all(item.anchor_text in make_poem().sections[0].lines[item.line_no - 1].text for item in result))
         self.assertNotIn("隋炀帝", result[0].reason)
-        self.assertIn("历史文化语境", result[0].reason)
+        self.assertIn("历史、文学或游冶空间语境", result[0].reason)
 
     def test_filter_limits_the_whole_poem_to_ten_candidates(self) -> None:
         poem = make_poem()
