@@ -1,4 +1,4 @@
-"""清商 Reader v0.2.0：本地词作阅读与候选证据审阅短注。"""
+"""清商 Reader v0.2.0-preview：可观察的 Evidence Review Workflow。"""
 
 from __future__ import annotations
 
@@ -79,6 +79,12 @@ REVIEW_ROLE_LABELS = {
     "irrelevant": "无关或误命中",
     "unknown": "关系不明",
 }
+WORKFLOW_STATUS_LABELS = {
+    "pending": "等待",
+    "running": "运行中",
+    "done": "完成",
+    "error": "失败",
+}
 EVIDENCE_EXCERPT_LIMIT = 160
 
 THEME_PALETTES = {
@@ -121,6 +127,169 @@ class ReaderAPIError(RuntimeError):
     """表示 Reader 无法从本地 FastAPI 获得有效数据。"""
 
 
+def _config_value(name: str, default: str = "") -> str:
+    """优先读取环境变量，再读取 Streamlit Cloud secrets。"""
+    value = os.getenv(name)
+    if value is not None:
+        return value
+
+    secret_paths = (
+        Path.home() / ".streamlit" / "secrets.toml",
+        PROJECT_ROOT / ".streamlit" / "secrets.toml",
+    )
+    if not any(path.exists() for path in secret_paths):
+        return default
+
+    try:
+        secret = st.secrets.get(name, default)
+    except Exception:
+        # secrets 文件无效时仍使用本地默认值，让正文保持可读。
+        return default
+    return str(secret)
+
+
+def _public_demo_mode() -> bool:
+    return _config_value("PUBLIC_DEMO_MODE", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _demo_poems() -> list[dict[str, Any]]:
+    return [
+        {
+            "poem_id": "demo-nandu-shidai",
+            "author": "周邦彦",
+            "dynasty": "宋",
+            "tune_name": "少年游",
+            "title": None,
+            "series_label": "示例",
+        }
+    ]
+
+
+def _demo_poem_detail() -> dict[str, Any]:
+    return {
+        **_demo_poems()[0],
+        "preface": None,
+        "source": "Public Demo Mode 内置样例文本",
+        "sections": [
+            {
+                "section_no": 1,
+                "section_name": "全篇",
+                "lines": [
+                    {
+                        "global_line_no": 1,
+                        "section_line_no": 1,
+                        "text": "南都石黛扫晴山。",
+                    },
+                    {
+                        "global_line_no": 2,
+                        "section_line_no": 2,
+                        "text": "衣薄耐朝寒。",
+                    },
+                ],
+            }
+        ],
+    }
+
+
+def _demo_workflow_result(selected_text: str, line_no: int | None) -> dict[str, Any]:
+    """在公共部署没有后端依赖时提供清楚标记的固定样例。"""
+    review = {
+        "review_status": "reviewed",
+        "confidence": "high",
+        "short_note": "候选证据显示，“石黛”可指画眉颜料；此处将“晴山”联系眉黛，是一种有文献依据但仍需人工确认的读法。",
+        "best_evidence": [
+            {
+                "evidence_id": "sample-e1",
+                "source": "cnkgraph_reference",
+                "query_used": "南都石黛",
+                "title": "玉台新咏序",
+                "source_ref": "南朝 徐陵 《玉台新咏序》",
+                "role": "prior_source",
+                "relevance": "strong",
+                "reason": "内置样例中的前代文献候选与“南都石黛”原文短语可直接比对。",
+            }
+        ],
+        "downgraded_evidence": [],
+        "rejected_evidence": [],
+        "caveat": "Public Demo Mode sample data，不代表实时 CNKGraph 或 LLM 结果。",
+    }
+    candidate = {
+        "line_no": 1,
+        "line_text": "南都石黛扫晴山。",
+        "anchor_text": "南都石黛",
+        "candidate_type": "literary_reference",
+        "query": "南都石黛",
+        "query_variants": ["南都石黛", "徐陵 玉台新咏序 石黛"],
+        "reason": "该原文短语可能涉及前代文献语词、成句或诗文化用，值得进一步查证。",
+        "confidence": "high",
+        "evidence_results": [],
+        "overall_status": "hit",
+        "review_result": review,
+    }
+    return {
+        "poem_id": "demo-nandu-shidai",
+        "line_no": line_no or 1,
+        "selected_text": selected_text or "南都石黛扫晴山。",
+        "intent": "allusion_or_reference_explanation",
+        "candidates": [candidate],
+        "workflow_trace": [
+            {
+                "step_name": "intent_router",
+                "status": "done",
+                "tool_name": "rule_router",
+                "latency_ms": 1,
+                "input_summary": selected_text or "南都石黛扫晴山。",
+                "output_summary": "allusion_or_reference_explanation",
+                "error": None,
+            },
+            {
+                "step_name": "candidate_extraction",
+                "status": "done",
+                "tool_name": "sample_candidate_extractor",
+                "latency_ms": 2,
+                "input_summary": "Public Demo Mode sample data",
+                "output_summary": "保留 1 个句级候选",
+                "error": None,
+            },
+            {
+                "step_name": "evidence_retrieval",
+                "status": "done",
+                "tool_name": "sample_cnkgraph",
+                "latency_ms": 2,
+                "input_summary": "1 个候选",
+                "output_summary": "获得 1 条内置候选证据",
+                "error": None,
+            },
+            {
+                "step_name": "evidence_review",
+                "status": "done",
+                "tool_name": "sample_evidence_reviewer",
+                "latency_ms": 2,
+                "input_summary": "1 个候选证据包",
+                "output_summary": "完成 1 个审阅",
+                "error": None,
+            },
+            {
+                "step_name": "final_answer",
+                "status": "done",
+                "tool_name": "deterministic_aggregator",
+                "latency_ms": 1,
+                "input_summary": "1 个 Review 结果",
+                "output_summary": "已生成 sample 审阅短注",
+                "error": None,
+            },
+        ],
+        "final_answer": review["short_note"] + " 本页为 sample data。",
+        "errors": [],
+        "sample_data": True,
+    }
+
+
 class BreathingFragment(TypedDict):
     """一段可点击的慢读文本及其原始词句定位。"""
 
@@ -133,7 +302,7 @@ class BreathingFragment(TypedDict):
 
 
 def _api_url(path: str) -> str:
-    base_url = os.getenv("QINGSHANG_API_BASE_URL", DEFAULT_API_BASE_URL)
+    base_url = _config_value("QINGSHANG_API_BASE_URL", DEFAULT_API_BASE_URL)
     return f"{base_url.rstrip('/')}{path}"
 
 
@@ -156,35 +325,45 @@ def _response_json(response: httpx.Response) -> Any:
 @st.cache_data(ttl=30, show_spinner=False)
 def fetch_poems() -> list[dict[str, Any]]:
     """读取周邦彦词作目录。"""
+    if _public_demo_mode():
+        return _demo_poems()
     try:
         response = httpx.get(
             _api_url("/api/poems"),
             params={"author": "周邦彦", "limit": 500},
             timeout=API_TIMEOUT_SECONDS,
         )
-    except httpx.RequestError as exc:
+        data = _response_json(response)
+    except (httpx.RequestError, ReaderAPIError) as exc:
+        if _public_demo_mode():
+            return _demo_poems()
         raise ReaderAPIError("无法连接清商 FastAPI") from exc
-    data = _response_json(response)
     return data if isinstance(data, list) else []
 
 
 @st.cache_data(ttl=30, show_spinner=False)
 def fetch_poem(poem_id: str) -> dict[str, Any]:
     """读取一首词的完整结构。"""
+    if _public_demo_mode() and poem_id == "demo-nandu-shidai":
+        return _demo_poem_detail()
     try:
         response = httpx.get(
             _api_url(f"/api/poems/{poem_id}"),
             timeout=API_TIMEOUT_SECONDS,
         )
-    except httpx.RequestError as exc:
+        data = _response_json(response)
+    except (httpx.RequestError, ReaderAPIError) as exc:
+        if _public_demo_mode() and poem_id == "demo-nandu-shidai":
+            return _demo_poem_detail()
         raise ReaderAPIError("无法读取词作详情") from exc
-    data = _response_json(response)
     return data if isinstance(data, dict) else {}
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_opening_lines(poem_ids: tuple[str, ...]) -> dict[str, str]:
     """并发读取当前目录页无标题词作的起句，不改变列表接口。"""
+    if _public_demo_mode() and poem_ids == ("demo-nandu-shidai",):
+        return {"demo-nandu-shidai": "南都石黛扫晴山。"}
 
     def fetch_one(poem_id: str) -> tuple[str, str | None]:
         try:
@@ -301,6 +480,15 @@ def fetch_reading_aids(
     include: list[str],
 ) -> dict[str, Any]:
     """手动请求当前词作的阅读辅助证据。"""
+    if _public_demo_mode():
+        return {
+            "poem_id": poem_id,
+            "selected_text": selected_text,
+            "evidences": [],
+            "allusions": [],
+            "prosody": {},
+            "errors": ["sample: Public Demo Mode 不调用实时阅读辅助工具"],
+        }
     payload = {
         "selected_text": selected_text,
         "line_no": line_no,
@@ -318,16 +506,31 @@ def fetch_reading_aids(
     return data if isinstance(data, dict) else {}
 
 
-def fetch_allusion_candidates(poem_id: str) -> dict[str, Any]:
-    """识别候选、查询 CNKGraph，并请求受控 Evidence Review。"""
+def fetch_reading_workflow(
+    poem_id: str,
+    selected_text: str,
+    line_no: int | None,
+    max_candidates: int = 5,
+) -> dict[str, Any]:
+    """运行句级 Evidence Review Workflow，公共演示可降级到内置样例。"""
+    if _public_demo_mode():
+        return _demo_workflow_result(selected_text, line_no)
+    payload = {
+        "line_no": line_no,
+        "selected_text": selected_text,
+        "max_candidates": max_candidates,
+    }
     try:
         response = httpx.post(
-            _api_url(f"/api/poems/{poem_id}/allusion-candidates/with-review"),
+            _api_url(f"/api/poems/{poem_id}/reading-workflow"),
+            json=payload,
             timeout=REVIEW_TIMEOUT_SECONDS,
         )
-    except httpx.RequestError as exc:
-        raise ReaderAPIError("候选证据审阅请求失败，正文仍可继续阅读") from exc
-    data = _response_json(response)
+        data = _response_json(response)
+    except (httpx.RequestError, ReaderAPIError) as exc:
+        if _public_demo_mode():
+            return _demo_workflow_result(selected_text, line_no)
+        raise ReaderAPIError("阅读工作流请求失败，正文仍可继续阅读") from exc
     return data if isinstance(data, dict) else {}
 
 
@@ -659,7 +862,7 @@ def render_hero() -> None:
         f"""
         <div class="reader-hero" style="background-image: url('data:image/webp;base64,{encoded}')">
             <div class="reader-brand">清商</div>
-            <div class="reader-version">Reader v0.2.0 · 周邦彦词作</div>
+            <div class="reader-version">Reader v0.2.0-preview · 周邦彦词作</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1155,6 +1358,44 @@ def _review_result_html(review: dict[str, Any]) -> str:
     )
 
 
+def _workflow_trace_step_html(step: dict[str, Any]) -> str:
+    """把单步 trace 转为安全 HTML，供 UI 与单元测试共同使用。"""
+    step_name = html.escape(str(step.get("step_name") or "unknown"))
+    tool_name = html.escape(str(step.get("tool_name") or "-"))
+    status = html.escape(
+        WORKFLOW_STATUS_LABELS.get(str(step.get("status") or ""), "未知")
+    )
+    latency = int(step.get("latency_ms") or 0)
+    input_summary = html.escape(str(step.get("input_summary") or "-"))
+    output_summary = html.escape(str(step.get("output_summary") or "-"))
+    error = html.escape(str(step.get("error") or ""))
+    return (
+        "<div class='evidence-preview-item'>"
+        f"<strong>{step_name}</strong> · {status} · {latency} ms<br>"
+        f"工具：{tool_name}<br>输入：{input_summary}<br>输出：{output_summary}"
+        f"{'<br>错误：' + error if error else ''}</div>"
+    )
+
+
+def render_workflow_summary(result: dict[str, Any]) -> None:
+    """展示工作流聚合结果和五步可观察 trace。"""
+    st.markdown("#### AI 工作流")
+    if result.get("sample_data"):
+        st.info("Public Demo Mode：以下为 sample data，不是实时 LLM / CNKGraph 结果。")
+    final_answer = str(result.get("final_answer") or "暂无可生成的审阅短注。")
+    st.markdown(
+        "<div class='evidence-card'><div class='evidence-anchor'>工作流结果</div>"
+        f"<div class='evidence-body'>{html.escape(final_answer)}</div></div>",
+        unsafe_allow_html=True,
+    )
+    st.caption(f"意图：{result.get('intent') or 'unknown'}")
+    with st.expander("查看 Workflow Trace", expanded=False):
+        for step in result.get("workflow_trace") or []:
+            st.markdown(_workflow_trace_step_html(step), unsafe_allow_html=True)
+    for error in result.get("errors") or []:
+        st.caption(f"局部错误：{error}")
+
+
 def render_allusion_evidence_preview(
     poem_id: str,
     candidates: list[dict[str, Any]],
@@ -1396,31 +1637,46 @@ def render_reading_results(
 
 
 def render_tools(poem: dict[str, Any]) -> None:
-    """展示 AI 候选入口、手动工具表单和证据结果。"""
+    """展示可观察工作流、手动工具表单和证据结果。"""
     st.markdown("### 阅读辅助")
+    st.caption("AI 工作流只审阅现有 CNKGraph 候选证据，不代表最终定论。")
     if st.button(
-        "AI 审阅候选证据并生成短注",
+        "运行证据审阅工作流",
         key=f"extract-allusions-{poem['poem_id']}",
         use_container_width=True,
     ):
         st.session_state.allusion_candidates = None
         st.session_state.allusion_candidate_error = None
         st.session_state.pop("allusion_candidate_selection", None)
-        try:
-            with st.spinner("正在识别、查证并逐项审阅候选证据"):
-                st.session_state.allusion_candidates = fetch_allusion_candidates(
-                    poem["poem_id"]
-                )
-        except ReaderAPIError as exc:
-            st.session_state.allusion_candidate_error = str(exc)
+        normalized_text = str(st.session_state.get("selected_text") or "").strip()
+        if not normalized_text:
+            st.session_state.allusion_candidate_error = "请先点击一句词或输入待查文本"
+        else:
+            line_no = (
+                st.session_state.selected_line_no
+                if normalized_text == st.session_state.selected_line_text
+                else None
+            )
+            try:
+                with st.spinner("正在路由、识别、查证并审阅候选证据"):
+                    st.session_state.allusion_candidates = fetch_reading_workflow(
+                        poem["poem_id"],
+                        normalized_text,
+                        line_no,
+                    )
+            except ReaderAPIError as exc:
+                st.session_state.allusion_candidate_error = str(exc)
 
     if st.session_state.allusion_candidate_error:
         st.error(st.session_state.allusion_candidate_error)
 
-    candidates = _allusion_candidate_items(st.session_state.allusion_candidates)
+    workflow_result = st.session_state.allusion_candidates
+    if workflow_result:
+        render_workflow_summary(workflow_result)
+    candidates = _allusion_candidate_items(workflow_result)
     if st.session_state.allusion_candidates is not None and not candidates:
         st.markdown(
-            "<div class='empty-state'>本词暂未识别到明确的典故候选</div>",
+            "<div class='empty-state'>当前文本暂未识别到明确的典故/化用候选</div>",
             unsafe_allow_html=True,
         )
     elif candidates:
@@ -1548,6 +1804,8 @@ def main() -> None:
     initialize_state(poems)
     render_poem_directory(poems)
     render_hero()
+    if _public_demo_mode():
+        st.info("Public Demo Mode 已启用：页面使用明确标记的 sample data。")
 
     try:
         poem = fetch_poem(st.session_state.poem_id)

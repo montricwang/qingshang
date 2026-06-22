@@ -2,7 +2,7 @@
 
 > 更新日期：2026-06-22
 > 仓库基线：`main` / `c5e5160`
-> 当前工作区：Reader v0.2.0 Evidence Review Annotation，数据库结构未改动
+> 当前工作区：Reader v0.2.0-preview Evidence Review Workflow，数据库结构未改动
 
 ## 1. 当前代码现状
 
@@ -27,8 +27,21 @@ HTTP 请求
   -> JSON 响应
 ```
 
-当前包含 FastAPI 后端、Reader v0.2.0 Streamlit 前端、数据清洗/导入脚本和单元测试。
+当前包含 FastAPI 后端、Reader v0.2.0-preview Streamlit 前端、数据清洗/导入脚本和单元测试。
 当前没有用户系统、权限系统、Alembic 数据库迁移、Docker 配置或 CI。
+
+### 2026-06-22 Reader v0.2.0-preview / Evidence Review Workflow
+
+- 新增 `POST /api/poems/{poem_id}/reading-workflow`，按固定顺序执行 Intent Router、Candidate Extraction、CNKGraph Evidence Retrieval、Evidence Review 和 Final Answer；旧候选、带证据及带审阅接口保持兼容。
+- 新增 `app/schemas/workflow.py`，定义句级请求、稳定的 `WorkflowTraceStep` 与聚合响应；trace 记录 step、tool、status、latency、输入/输出摘要和稳定错误。
+- 新增 `app/services/reading_workflow.py`，复用现有候选提取、典故/出处检索和受控 Reviewer；单个候选审阅失败只写入局部错误，不中止其他候选。
+- 新增 `app/services/evidence_reviewer.py` 作为正式 workflow 入口，继续复用 v0.2.0 Reviewer 的证据 ID 核验、自命中降权、前代来源优先和证据不足不生成短注等规则。
+- Final Answer 只聚合 `reviewed` 状态的合规短注，并固定提醒人工确认；它不是新的自由生成 LLM 步骤。
+- Reader 新增“运行证据审阅工作流”，基于当前点击句或手动短语运行；展示聚合结果、五步 trace、候选中文类型、审阅短注与折叠的原候选证据。
+- 新增 Public Demo Mode：`PUBLIC_DEMO_MODE=true` 时使用清楚标记的内置 `sample data`，不连接 PostgreSQL、LLM 或 CNKGraph；入口仍是 `apps/reader_app.py`，配置模板为 `.streamlit/secrets.toml.example`。
+- README 已补充项目定位、本地启动、Streamlit Cloud demo 与简短 Azure 迁移方向；真实密钥和 `.streamlit/secrets.toml` 不入库。
+- 本轮未做 Web Search、Poetry RAG、CCPoem-Bert、LangGraph/Agent、知人论世、数据库/ORM 变更、缓存或结果持久化。
+- `.venv\Scripts\python.exe -m compileall app apps scripts tests` 已通过；`.venv\Scripts\python.exe -m pytest -q` 已通过 52 项测试。现有 Starlette `TestClient/httpx` 弃用警告和 `.pytest_cache` 写权限警告不影响结果。
 
 ### 2026-06-22 Reader v0.2.0 / Evidence Review Annotation
 
@@ -432,6 +445,10 @@ HTTP 请求
 | `GET` | `/api/poems/{poem_id}` | 查询一首词的完整详情 | Path：稳定 `poem_id` | `PoemCore`，包含全文、题序、sections、lines、来源；不存在返回 404 |
 | `POST` | `/api/poems/{poem_id}/analyze` | 调用 LLM 生成结构化整首分析 | Path：`poem_id`；无 Body | JSON：摘要、情感流动、风格、意象、逐句翻译与解释；不存在返回 404，分析错误当前返回 500 |
 | `POST` | `/api/poems/{poem_id}/allusion-candidates` | 调用 LLM 识别整首词中的疑似典故候选 | Path：`poem_id`；无 Body | `poem_id` 与最多 10 个候选；每项包含原句行号、原文锚点、类型、检索词、疑似理由和置信度 |
+| `POST` | `/api/poems/{poem_id}/allusion-candidates/with-evidence` | 为整首候选自动查询 CNKGraph 候选证据 | Path：`poem_id`；无 Body | 候选、逐 query/source 的 `hit/no_result/error` 与窄证据字段 |
+| `POST` | `/api/poems/{poem_id}/allusion-candidates/with-review` | 审阅整首候选已有的 CNKGraph 证据 | Path：`poem_id`；无 Body | 候选证据、Review 状态、审阅短注及最佳/降级/拒绝证据 |
+| `POST` | `/api/poems/{poem_id}/reading-workflow` | 运行句级五步 Evidence Review Workflow | Body：`line_no?`、`selected_text?`、`max_candidates: 1..10` | 意图、候选与 Review、五步 trace、谨慎聚合回答和局部错误 |
+| `POST` | `/api/poems/{poem_id}/reading-aids` | 手动查询当前文本的阅读辅助 | Body：`selected_text`、`line_no?`、`include` | 字词、典故、出处、韵部、词谱等窄结果与按工具局部错误 |
 
 ### FastAPI 自动接口
 

@@ -1,119 +1,65 @@
-# Qingshang 代码阅读指南
+# 清商 Qingshang
 
-这是一个使用 FastAPI、Pydantic、SQLAlchemy 和 httpx 编写的异步 API 项目。
-它和普通顺序执行脚本最大的区别是：应用启动时主要在**登记规则**，真正的函数调用
-由 Web 请求触发，FastAPI 再根据这些规则替我们准备参数、调用函数和生成响应。
+清商是一个面向宋词阅读的 vertical-domain、evidence-grounded AI 应用。项目以结构化词作数据为底本，通过固定工作流串联候选识别、CNKGraph 候选证据检索、受控 Evidence Review 与谨慎短注，同时保留每一步的输入摘要、输出摘要、耗时和局部错误。
 
-## 从哪里开始读
+当前版本是 **Reader v0.2.0-preview**。它不是开放式 Agent：不使用 Web Search、Poetry RAG 或 LangGraph，也不会把检索命中直接称为定论。
 
-推荐按照下面的顺序阅读：
-
-1. `app/main.py`：创建应用并注册总路由。
-2. `app/api/routes/poems.py`：观察路由装饰器、参数来源和依赖注入。
-3. `app/db/session.py`：观察数据库会话怎样由 `Depends` 自动创建和关闭。
-4. `app/crud/poem.py`：观察查询表达式何时构造、何时真正执行。
-5. `app/models/poem.py`：理解 ORM 如何把数据库记录表示成 Python 对象。
-6. `app/schemas/poem.py`：理解 Pydantic 如何校验输入和限制输出。
-7. `app/services/llm_client.py`：观察异步外部 HTTP 调用。
-
-## 启动阶段发生什么
-
-执行：
-
-```powershell
-uvicorn app.main:app
-```
-
-大致过程如下：
-
-1. Uvicorn 导入 `app.main`。
-2. Python 执行模块顶层代码，创建 `FastAPI` 对象。
-3. 导入 `app.api.routes` 时，各路由模块也被导入。
-4. `@router.get(...)` 和 `@router.post(...)` 装饰器把函数登记进路由表。
-5. `app.include_router(api_router)` 把总路由表登记进应用。
-6. Uvicorn 启动事件循环，等待请求。
-
-这时 `read_poem_list` 等路由函数还没有执行。装饰器只是把“什么请求应调用什么函数”
-保存下来，这就是框架取得控制权的第一处。
-
-## 查询列表的调用链
-
-请求示例：
+## 当前链路
 
 ```text
-GET /api/poems?author=周邦彦&limit=20
+Reader 选句
+  -> Intent Router（规则）
+  -> Candidate Extraction（LLM）
+  -> CNKGraph Evidence Retrieval（现有典故与出处工具）
+  -> Evidence Review（只审阅已检索证据）
+  -> Final Answer（确定性聚合）
 ```
 
-FastAPI 自动完成以下流程：
+后端使用 FastAPI、PostgreSQL、SQLAlchemy Async ORM 与 Pydantic；前端入口是 `apps/reader_app.py`。
 
-1. 在路由表中找到 `read_poem_list`。
-2. 从 URL 查询字符串读取 `author` 和 `limit`。
-3. 按 `Query` 中的规则校验范围；失败就直接返回 422。
-4. 发现参数 `db=Depends(get_db)`，于是先调用 `get_db`。
-5. `get_db` 创建 `AsyncSession`，通过 `yield` 交给路由的 `db` 参数。
-6. 路由调用 `list_poems`，后者构造 SQLAlchemy 查询并执行 SQL。
-7. 路由把 ORM 对象转换成 `PoemListItem`。
-8. FastAPI 按 `response_model` 再校验输出并序列化为 JSON。
-9. 请求结束后，FastAPI 回到 `get_db` 的 `yield` 后面并关闭 session。
+## 本地运行
 
-这里没有代码显式写出“调用 get_db，再把结果传给 read_poem_list”，因为这段调用由
-FastAPI 的依赖注入系统执行。
+1. 复制 `.env.example` 为 `.env`，填写本地 PostgreSQL 和 LLM 配置。
+2. 启动 FastAPI：
 
-## Pydantic 做了什么
-
-`BaseModel` 子类是一份运行时数据契约。例如：
-
-```python
-class PoemLine(BaseModel):
-    global_line_no: int = Field(..., ge=1)
+```powershell
+.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
 ```
 
-它不仅是类型提示。程序校验一条词句时，Pydantic 会：
+3. 在另一个终端启动 Reader：
 
-1. 从字典或 ORM 对象读取字段；
-2. 检查 `global_line_no` 是否存在、是否为整数、是否至少为 1；
-3. 成功后创建 `PoemLine` 对象；
-4. 失败时生成结构化校验错误。
+```powershell
+.venv\Scripts\python.exe -m streamlit run apps/reader_app.py --server.port 8501
+```
 
-`ConfigDict(from_attributes=True)` 表示除了字典，Pydantic 也可以从 ORM 对象的同名
-属性读取数据。
+打开 `http://127.0.0.1:8501/`。FastAPI 文档位于 `http://127.0.0.1:8000/docs`。
 
-## SQLAlchemy ORM 做了什么
+## Public Demo Mode
 
-`mapped_column` 和 `relationship` 在类定义时向 SQLAlchemy 描述数据库结构：
+Streamlit Cloud 的 entry file 使用 `apps/reader_app.py`。在部署 secrets 中设置：
 
-- `mapped_column` 描述数据库列、类型、主键和外键。
-- `relationship` 描述 Python 对象之间如何导航，例如 `poem.sections`。
-- `select(PoemModel)` 构造查询表达式，还没有访问数据库。
-- `await db.execute(stmt)` 才真正通过 asyncpg 把 SQL 发给 PostgreSQL。
-- `result.scalars()` 把结果中的 ORM 实体取出来。
+```toml
+PUBLIC_DEMO_MODE = true
+```
 
-`relationship` 可能采用延迟加载，即读取属性时才查询数据库。本项目的详情查询使用
-`selectinload` 预先加载 `sections` 和 `lines`，使后面的响应序列化不再偷偷发 SQL。
+此模式使用内置固定样例，不需要数据库、LLM key 或 CNKGraph；页面会明确标记为 `sample data`。配置模板见 `.streamlit/secrets.toml.example`，真实 secrets 不应提交到 Git。
 
-## async 和 await 做了什么
+本地也可使用：
 
-`async def` 创建的是异步函数。调用它不会像普通函数一样直接完成，必须使用
-`await`。等待数据库或网络时，事件循环可以切换去处理其他请求；等待结束后再从
-当前代码位置继续执行。
+```powershell
+$env:PUBLIC_DEMO_MODE="true"
+.venv\Scripts\python.exe -m streamlit run apps/reader_app.py --server.port 8501
+```
 
-`async with` 是异步上下文管理器。它保证资源在代码块结束时被释放，例如：
+## 验证
 
-- `AsyncSessionLocal()` 在退出时关闭数据库会话；
-- `httpx.AsyncClient()` 在退出时释放 HTTP 连接资源。
+```powershell
+.venv\Scripts\python.exe -m compileall app apps scripts tests
+.venv\Scripts\python.exe -m pytest -q
+```
 
-## 建议设置的断点
+## 部署方向
 
-为了亲眼看到控制流，可以依次在这些函数第一行设置断点：
+正式部署可逐步迁移到 Azure：FastAPI 运行于 App Service 或 Container Apps，PostgreSQL 使用 Azure Database for PostgreSQL，配置进入 Key Vault；Streamlit 可先独立部署。迁移不改变当前 API 与 evidence-first workflow 边界。
 
-1. `app/main.py` 的模块顶层：观察启动导入。
-2. `app/api/routes/poems.py:read_poem_list`：观察请求参数已经被准备好。
-3. `app/db/session.py:get_db`：观察 `yield` 前后分别在请求开始和结束执行。
-4. `app/crud/poem.py:list_poems`：观察 `stmt` 与 `execute` 的区别。
-5. `app/services/llm_client.py:chat_completion`：观察外部请求和响应转换。
-
-## 离线脚本与 Web 应用的区别
-
-`scripts/` 下的文件是普通脚本。它们通过 `if __name__ == "__main__"` 主动调用
-`main()`，执行顺序从上到下，更接近常规 Python 程序。它们不会使用 FastAPI 的
-`Depends`，因此必须自行创建和关闭数据库 session。
+初学者代码阅读说明保留在 `docs/code-reading/`，最新项目状态见 `docs/sync/latest.md`。

@@ -6,6 +6,7 @@ from collections.abc import Awaitable
 
 from app.models.poem import PoemModel
 from app.schemas.allusion import (
+    AllusionCandidateItem,
     AllusionCandidateEvidenceItem,
     AllusionCandidateEvidenceResponse,
     CandidateEvidenceResult,
@@ -226,10 +227,18 @@ async def build_allusion_evidence_preview(
 ) -> AllusionCandidateEvidenceResponse:
     """识别整首词候选，并为每个查询变体生成可独立降级的证据结果。"""
     extracted = await extract_allusion_candidates(poem)
+    return await retrieve_evidence_for_candidates(poem, extracted.candidates)
+
+
+async def retrieve_evidence_for_candidates(
+    poem: PoemModel,
+    candidates: list[AllusionCandidateItem],
+) -> AllusionCandidateEvidenceResponse:
+    """为已经识别的候选查询证据，供固定 workflow 复用。"""
     preview_items: list[AllusionCandidateEvidenceItem] = []
     errors: list[str] = []
 
-    for candidate in extracted.candidates[:10]:
+    for candidate in candidates[:10]:
         evidence_results: list[CandidateEvidenceResult] = []
         seen_by_source: dict[EvidenceSource, set[tuple[str, str, str]]] = {
             "cnkgraph_allusion": set(),

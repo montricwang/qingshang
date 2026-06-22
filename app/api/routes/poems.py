@@ -14,8 +14,10 @@ from app.schemas.allusion import (
 from app.services.allusion_evidence import build_allusion_evidence_preview
 from app.services.allusion_evidence_reviewer import build_allusion_evidence_review
 from app.schemas.poem import PoemCore, PoemListItem
+from app.schemas.workflow import ReadingWorkflowRequest, ReadingWorkflowResult
 from app.services.allusion_candidate_extractor import extract_allusion_candidates
 from app.services.poem_analyzer import analyze_poem
+from app.services.reading_workflow import run_reading_workflow
 
 from app.db.session import get_db
 
@@ -148,4 +150,33 @@ async def read_allusion_candidates_with_review(
         raise HTTPException(
             status_code=500,
             detail=f"候选证据审阅失败：{exc}",
+        ) from exc
+
+
+@router.post(
+    "/{poem_id}/reading-workflow",
+    response_model=ReadingWorkflowResult,
+)
+async def read_reading_workflow(
+    poem_id: str,
+    request: ReadingWorkflowRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ReadingWorkflowResult:
+    """运行固定、可观察的句级证据审阅工作流。"""
+    try:
+        return await run_reading_workflow(
+            poem_id,
+            db=db,
+            line_no=request.line_no,
+            selected_text=request.selected_text,
+            max_candidates=request.max_candidates,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"阅读工作流失败：{exc}",
         ) from exc

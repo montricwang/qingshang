@@ -259,4 +259,15 @@
 - **风险等级**：high
 - **重审条件**：短注准备面向公开用户发布、需要保存人工确认、Reviewer 质量无法由固定样例约束、需要引入第二证据源，或成本/延迟超过原型可接受范围。
 - **建议动作**：暂缓扩展
-- **证据位置**：`app/services/allusion_evidence_reviewer.py`、`app/schemas/allusion.py:EvidenceReviewResult`、`app/api/routes/poems.py:read_allusion_candidates_with_review()`、`tests/test_evidence_reviewer.py`。
+- **证据位置**：`app/services/allusion_evidence_reviewer.py`、`app/services/evidence_reviewer.py`、`app/schemas/allusion.py:EvidenceReviewResult`、`app/api/routes/poems.py:read_allusion_candidates_with_review()`、`tests/test_evidence_reviewer.py`。
+
+### D-022 v0.2.0-preview 使用固定可观察 Workflow，不引入 Agent
+
+- **决策内容**：新增 `reading-workflow` 句级入口，以固定五步顺序串联规则意图路由、现有 LLM 候选提取、CNKGraph 典故/出处检索、封闭证据 Review 和确定性短注聚合；每步返回 trace。Public Demo Mode 只提供明确标记的固定样例。
+- **当时理由**：主线已经具备各个能力，但 Reader 需要一个可观察、可局部降级的正式入口；固定流程足以表达当前产品边界，无需让 Agent 自主选择工具或数据源。
+- **当前收益**：调用链、工具名、耗时和错误对用户及开发者可见；旧接口保持兼容；单候选失败不会中断整句流程；无后端依赖时仍可安全演示页面。
+- **当前代价**：每次 workflow 仍可能触发候选提取、最多多个 CNKGraph 查询和逐候选 LLM Review；当前没有缓存、限流、持久化或质量评测集，trace 也不是生产级 telemetry。
+- **风险等级**：high
+- **重审条件**：公网并发或成本上升、需要异步任务与重试、引入第二证据源、保存人工确认结果，或固定步骤无法覆盖明确的新阅读意图。
+- **建议动作**：保留
+- **证据位置**：`app/schemas/workflow.py`、`app/services/reading_workflow.py`、`POST /api/poems/{poem_id}/reading-workflow`、`apps/reader_app.py:render_workflow_summary()/render_tools()`。

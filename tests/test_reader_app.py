@@ -1,10 +1,13 @@
 """覆盖 Reader 中不依赖浏览器的展示整理逻辑。"""
 
+from unittest.mock import patch
+
 from apps.reader_app import (
     _all_candidates_have_no_evidence,
     _candidate_selection_payload,
     _candidate_type_label,
     _card_html,
+    _config_value,
     _evidence_preview_html,
     _evidence_count_text,
     _evidence_status_text,
@@ -15,10 +18,22 @@ from apps.reader_app import (
     _review_result_html,
     _strip_trailing_pause,
     _truncate_evidence_text,
+    _workflow_trace_step_html,
     bounded_line_index,
     build_breathing_fragments,
     flatten_poem_lines,
 )
+
+
+def test_config_value_does_not_read_missing_streamlit_secrets() -> None:
+    with (
+        patch("apps.reader_app.os.getenv", return_value=None),
+        patch("apps.reader_app.Path.exists", return_value=False),
+        patch("apps.reader_app.st.secrets.get") as secrets_get,
+    ):
+        assert _config_value("PUBLIC_DEMO_MODE", "false") == "false"
+
+    secrets_get.assert_not_called()
 
 
 def test_group_tool_errors_keeps_each_error_in_its_tool() -> None:
@@ -195,6 +210,25 @@ def test_reader_review_displays_short_note_and_escapes_model_text() -> None:
     assert "前代来源" in evidence
     assert "&lt;玉台新咏序&gt;" in evidence
     assert "<script>" not in evidence
+
+
+def test_workflow_trace_escapes_summaries_and_exposes_observable_fields() -> None:
+    trace = _workflow_trace_step_html(
+        {
+            "step_name": "<candidate_extraction>",
+            "status": "done",
+            "tool_name": "llm<script>",
+            "latency_ms": 17,
+            "input_summary": "<原文>",
+            "output_summary": "保留 1 个候选",
+            "error": None,
+        }
+    )
+
+    assert "&lt;candidate_extraction&gt;" in trace
+    assert "17 ms" in trace
+    assert "保留 1 个候选" in trace
+    assert "<script>" not in trace
 
 
 def test_strip_trailing_pause_only_removes_terminal_pause_marks() -> None:
