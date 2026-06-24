@@ -332,6 +332,7 @@ def fetch_poems() -> list[dict[str, Any]]:
             _api_url("/api/poems"),
             params={"author": "周邦彦", "limit": 500},
             timeout=API_TIMEOUT_SECONDS,
+            trust_env=False,
         )
         data = _response_json(response)
     except (httpx.RequestError, ReaderAPIError) as exc:
@@ -350,6 +351,7 @@ def fetch_poem(poem_id: str) -> dict[str, Any]:
         response = httpx.get(
             _api_url(f"/api/poems/{poem_id}"),
             timeout=API_TIMEOUT_SECONDS,
+            trust_env=False,
         )
         data = _response_json(response)
     except (httpx.RequestError, ReaderAPIError) as exc:
@@ -370,6 +372,7 @@ def fetch_opening_lines(poem_ids: tuple[str, ...]) -> dict[str, str]:
             response = httpx.get(
                 _api_url(f"/api/poems/{poem_id}"),
                 timeout=API_TIMEOUT_SECONDS,
+                trust_env=False,
             )
             data = _response_json(response)
         except (httpx.RequestError, ReaderAPIError):
@@ -499,6 +502,7 @@ def fetch_reading_aids(
             _api_url(f"/api/poems/{poem_id}/reading-aids"),
             json=payload,
             timeout=API_TIMEOUT_SECONDS,
+            trust_env=False,
         )
     except httpx.RequestError as exc:
         raise ReaderAPIError("阅读辅助请求失败，正文仍可继续阅读") from exc
@@ -525,6 +529,7 @@ def fetch_reading_workflow(
             _api_url(f"/api/poems/{poem_id}/reading-workflow"),
             json=payload,
             timeout=REVIEW_TIMEOUT_SECONDS,
+            trust_env=False,
         )
         data = _response_json(response)
     except (httpx.RequestError, ReaderAPIError) as exc:
