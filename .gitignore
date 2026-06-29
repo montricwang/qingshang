@@ -6,6 +6,10 @@ qingshang.db
 data/generated/*_review.md
 AGENTS.md
 docs/*
+!docs/code-reading/
+docs/code-reading/*
+!docs/code-reading/beginner-code-map.md
+!docs/code-reading/allusion-schema-state.md
 !docs/decisions/
 !docs/decisions/decision_register.md
 !docs/audits/

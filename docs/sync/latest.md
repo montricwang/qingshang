@@ -30,6 +30,20 @@ HTTP 请求
 当前包含 FastAPI 后端、Reader v0.2.0 Streamlit 前端、数据清洗/导入脚本和单元测试。
 当前没有用户系统、权限系统、Alembic 数据库迁移、Docker 配置或 CI。
 
+### 2026-06-29 Reader 装配拆分与入门阅读文档
+
+- 本轮只拆 Streamlit 前端和补阅读文档；未修改后端、数据库 schema、API 返回结构、poem / section / line 数据契约。
+- `apps/reader_app.py` 收缩为 Reader 装配文件：保留页面配置、主题样式、横幅、目录数据读取、当前词作读取和左右栏组合。
+- 新增 `apps/reader/directory.py`：承接侧栏词作目录、筛选、分页和无题词起句显示。
+- 新增 `apps/reader/poem_view.py`：承接词作正文、通读/慢读/转轮/领读四种阅读模式。
+- 新增 `apps/reader/tools_panel.py`：承接右侧 AI 审阅入口、候选证据预览、手动 reading-aids 表单和各工具结果 Tabs。
+- 新增 `docs/code-reading/beginner-code-map.md`：只写项目入口、核心文件一句话地图和 AI 审阅按钮数据流。
+- 新增 `docs/code-reading/allusion-schema-state.md`：解释 `app/schemas/allusion.py` 中候选、证据结果、审阅结果，以及 `review_status` / `role` / `relevance` 的分工。
+- `.gitignore` 增加 `docs/code-reading/` 例外，让本轮阅读文档可被 Git 跟踪。
+- 已验证：`.venv\Scripts\python.exe -m compileall app apps scripts tests` 通过。
+- 未验证：未启动 Streamlit 手动点击 Reader；未连接 PostgreSQL；未真实调用 LLM 或 CNKGraph；未手动验证 `GET /health`、`GET /api/poems`、`GET /api/poems/{poem_id}`、`POST /api/poems/{poem_id}/allusion-candidates/with-review`。
+- 下一步建议：启动后端与 Reader，手动点一次“AI 审阅候选证据并生成短注”，确认 `session_state` 回填和 `render_allusion_evidence_preview()` 展示仍与拆分前一致。
+
 ### 2026-06-29 全项目步骤注释覆盖
 
 - 本轮按照 `allusion_evidence_reviewer.py` 和 `allusion_candidate_extractor.py` 中已有的"步骤编号 + 区隔线"注释模式，给项目中缺失这种注释的业务文件打上同类注释。
