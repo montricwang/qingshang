@@ -19,6 +19,8 @@ from apps.reader.api_client import (
 from apps.reader.config import (
     DIRECTORY_PAGE_SIZE,
     HERO_IMAGE,
+    READER_CSS,
+    READING_AID_TABS,
     READING_MODES,
     REVIEW_STATUS_LABELS,
     SPEED_SECONDS,
@@ -66,317 +68,9 @@ def install_styles(theme_name: str) -> None:
     variables = "\n".join(
         f"--qs-{name.replace('_', '-')}: {value};" for name, value in palette.items()
     )
+    css = READER_CSS.read_text(encoding="utf-8")
     st.markdown(
-        """<style>"""
-        + f":root {{ {variables} }}"
-        + """
-        .stApp { background: var(--qs-app-bg); color: var(--qs-text); }
-        [data-testid="stSidebar"] {
-            background: var(--qs-sidebar-bg);
-            border-right: 1px solid var(--qs-border);
-        }
-        [data-testid="stSidebar"] [data-testid="stButton"] button {
-            min-height: 2.15rem;
-            padding: 0.28rem 0.55rem;
-            text-align: left;
-            justify-content: flex-start;
-            border-radius: 4px;
-            letter-spacing: 0;
-        }
-        [data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
-            color: var(--qs-text-muted);
-            font-size: 0.78rem;
-            line-height: 1.3;
-            margin: -0.34rem 0 0.14rem 0.3rem;
-        }
-        [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
-            gap: 0.34rem;
-        }
-        [class*="st-key-directory-"] button {
-            min-height: 1.95rem !important;
-            padding-bottom: 0.15rem !important;
-            padding-top: 0.15rem !important;
-        }
-        .block-container {
-            max-width: 1480px;
-            padding-top: 1.25rem;
-            padding-bottom: 3rem;
-        }
-        .reader-hero {
-            height: 148px;
-            background-color: var(--qs-hero-tint);
-            background-blend-mode: var(--qs-hero-blend);
-            background-size: cover;
-            background-position: center;
-            border: 1px solid var(--qs-border);
-            border-radius: 6px;
-            margin-bottom: 1.2rem;
-            padding: 28px 36px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-        .reader-brand {
-            color: var(--qs-text);
-            font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
-            font-size: 2.25rem;
-            font-weight: 700;
-            line-height: 1.1;
-            letter-spacing: 0;
-        }
-        .reader-version {
-            color: var(--qs-accent);
-            font-size: 0.8rem;
-            margin-top: 0.55rem;
-            letter-spacing: 0;
-        }
-        .poem-heading {
-            border-bottom: 1px solid var(--qs-border);
-            padding: 0.25rem 0 1rem;
-            margin-bottom: 1.2rem;
-        }
-        .poem-tune {
-            color: var(--qs-text);
-            font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
-            font-size: 1.75rem;
-            font-weight: 700;
-            line-height: 1.25;
-            letter-spacing: 0;
-        }
-        .poem-title { color: var(--qs-text-muted); font-weight: 400; }
-        .poem-meta { color: var(--qs-text-muted); font-size: 0.9rem; margin-top: 0.45rem; }
-        .poem-preface {
-            color: var(--qs-text-muted);
-            font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
-            line-height: 1.9;
-            padding: 0.7rem 0;
-        }
-        .section-break {
-            background: var(--qs-border-soft);
-            height: 1px;
-            margin: 1.25rem 12% 0.75rem;
-            opacity: 0.4;
-        }
-        .evidence-card {
-            background: var(--qs-surface);
-            border: 1px solid var(--qs-border);
-            border-left: 3px solid var(--qs-green);
-            border-radius: 5px;
-            padding: 0.85rem 0.95rem;
-            margin: 0.55rem 0;
-            overflow-wrap: anywhere;
-        }
-        .evidence-anchor { color: var(--qs-accent); font-size: 0.78rem; font-weight: 700; }
-        .evidence-title { color: var(--qs-text); font-weight: 700; margin: 0.25rem 0; }
-        .evidence-body { color: var(--qs-text); font-size: 0.9rem; line-height: 1.65; }
-        .evidence-source {
-            color: var(--qs-text-muted);
-            border-top: 1px solid var(--qs-border-soft);
-            font-size: 0.75rem;
-            margin-top: 0.6rem;
-            padding-top: 0.5rem;
-        }
-        .evidence-preview {
-            border-top: 1px solid var(--qs-border-soft);
-            margin-top: 0.7rem;
-            padding-top: 0.65rem;
-        }
-        .evidence-preview-head { color: var(--qs-text); font-size: 0.84rem; }
-        .evidence-preview-meta { color: var(--qs-text-muted); font-size: 0.75rem; }
-        .evidence-preview-item {
-            color: var(--qs-text);
-            font-size: 0.82rem;
-            line-height: 1.55;
-            margin-top: 0.5rem;
-            padding-left: 0.65rem;
-            border-left: 2px solid var(--qs-green);
-        }
-        .evidence-preview-error { color: var(--qs-accent); font-size: 0.8rem; }
-        .empty-state {
-            color: var(--qs-text-muted);
-            border: 1px dashed var(--qs-border);
-            border-radius: 5px;
-            padding: 0.9rem;
-            margin: 0.5rem 0;
-        }
-        .future-slot {
-            background: var(--qs-surface-muted);
-            border: 1px solid var(--qs-border);
-            border-radius: 5px;
-            color: var(--qs-text-muted);
-            padding: 0.75rem 0.85rem;
-            margin-top: 0.65rem;
-            font-size: 0.83rem;
-        }
-        .future-slot strong { color: var(--qs-text); }
-        .tool-status {
-            background: var(--qs-surface-muted);
-            border-left: 2px solid var(--qs-border);
-            color: var(--qs-text-muted);
-            font-size: 0.82rem;
-            margin: 0.5rem 0;
-            padding: 0.65rem 0.75rem;
-        }
-        .query-hint { color: var(--qs-text-muted); font-size: 0.78rem; margin: -0.35rem 0 0.8rem; }
-        [data-testid="stForm"] {
-            background: var(--qs-surface);
-            border-radius: 6px;
-            border-color: var(--qs-border);
-            color: var(--qs-text);
-        }
-        [data-testid="stTextInput"] [data-baseweb="input"],
-        [data-testid="stTextInput"] input,
-        [data-testid="stTextInput"] div,
-        [data-baseweb="select"] > div {
-            background-color: var(--qs-surface) !important;
-            color: var(--qs-text) !important;
-        }
-        [data-testid="stTextInput"] [data-baseweb="input"],
-        [data-baseweb="select"] > div {
-            border-color: var(--qs-border) !important;
-        }
-        [data-testid="stTextInput"] input::placeholder {
-            color: var(--qs-text-muted) !important;
-            opacity: 0.82;
-        }
-        [data-testid="stTextInput"]:focus-within [data-baseweb="input"],
-        [data-testid="stTextInput"] [data-baseweb="base-input"]:focus-within,
-        [data-baseweb="select"] > div:focus-within {
-            border-color: var(--qs-accent) !important;
-            box-shadow: 0 0 0 1px var(--qs-accent) !important;
-            outline: 1px solid var(--qs-accent) !important;
-            outline-offset: -1px;
-        }
-        [data-baseweb="popover"],
-        [data-baseweb="popover"] > div,
-        [data-baseweb="menu"],
-        [role="listbox"] {
-            background-color: var(--qs-surface) !important;
-            border-color: var(--qs-border) !important;
-            color: var(--qs-text) !important;
-        }
-        [data-baseweb="menu"] li,
-        [role="option"] {
-            background-color: var(--qs-surface) !important;
-            color: var(--qs-text) !important;
-        }
-        [data-baseweb="menu"] li:hover,
-        [role="option"]:hover {
-            background-color: var(--qs-surface-muted) !important;
-        }
-        [data-testid="stButtonGroup"] button[data-testid^="stBaseButton-pills"] {
-            background: var(--qs-surface-muted) !important;
-            border: 1px solid var(--qs-border) !important;
-            color: var(--qs-text-muted) !important;
-            min-height: 2rem;
-        }
-        [data-testid="stButtonGroup"] button[data-testid="stBaseButton-pillsActive"] {
-            background: var(--qs-accent-soft) !important;
-            border-color: var(--qs-accent) !important;
-            color: var(--qs-accent) !important;
-        }
-        [data-testid="stTabs"] button {
-            color: var(--qs-text-muted);
-            letter-spacing: 0;
-        }
-        [data-testid="stTabs"] button[aria-selected="true"] {
-            color: var(--qs-accent);
-            border-bottom-color: var(--qs-accent);
-        }
-        [data-testid="stButton"] button,
-        [data-testid="stFormSubmitButton"] button {
-            background: transparent;
-            border-color: var(--qs-border);
-            border-radius: 4px;
-            color: var(--qs-text);
-            letter-spacing: 0;
-        }
-        button[kind="primary"], button[kind="primaryFormSubmit"] {
-            background: var(--qs-accent-soft) !important;
-            border-color: var(--qs-accent) !important;
-            color: var(--qs-accent) !important;
-        }
-        button[kind="primary"]:hover, button[kind="primaryFormSubmit"]:hover {
-            background: var(--qs-accent-soft) !important;
-            border-color: var(--qs-accent-hover) !important;
-            color: var(--qs-accent-hover) !important;
-        }
-        [class*="st-key-line-"] button {
-            background: transparent;
-            border-color: transparent;
-            color: var(--qs-text);
-            font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
-            font-size: 1rem;
-            font-weight: 400;
-            min-height: 2.55rem;
-            padding-left: 0.7rem;
-            justify-content: flex-start;
-            text-align: left;
-        }
-        [class*="st-key-line-"] button p {
-            text-align: left;
-            white-space: pre-wrap;
-            width: 100%;
-        }
-        [class*="st-key-line-"] button:hover {
-            background: var(--qs-surface-muted);
-            border-color: var(--qs-border);
-            color: var(--qs-text);
-        }
-        [class*="st-key-line-"] button[kind="primary"] {
-            background: var(--qs-accent-soft) !important;
-            border-color: transparent !important;
-            color: var(--qs-accent) !important;
-            box-shadow: inset 2px 0 0 var(--qs-accent);
-        }
-        [class*="st-key-line-overview-"] button,
-        [class*="st-key-line-overview-"] button p {
-            justify-content: center;
-            text-align: center;
-        }
-        .focus-reader {
-            min-height: 18rem;
-            padding: 2.5rem 0 1.5rem;
-        }
-        .focus-context {
-            color: var(--qs-text-muted);
-            font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
-            min-height: 3.2rem;
-            opacity: 0.38;
-            padding: 0.85rem 1rem;
-            text-align: center;
-        }
-        .focus-position {
-            color: var(--qs-text-muted);
-            font-size: 0.75rem;
-            margin: 0.7rem 0;
-            text-align: center;
-        }
-        [class*="st-key-focus-current-"] button {
-            animation: qs-focus-in 220ms ease-out;
-            background: var(--qs-accent-soft) !important;
-            border-color: transparent !important;
-            color: var(--qs-text) !important;
-            font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
-            font-size: 1.2rem;
-            justify-content: center;
-            min-height: 4.4rem;
-            padding: 1rem 1.4rem;
-            text-align: center;
-        }
-        [class*="st-key-focus-current-"] button p { text-align: center; }
-        [class*="st-key-focus-nav-"] button { min-height: 2.25rem; }
-        @keyframes qs-focus-in {
-            from { opacity: 0.45; }
-            to { opacity: 1; }
-        }
-        @media (max-width: 900px) {
-            .block-container { padding-left: 1rem; padding-right: 1rem; }
-            .reader-hero { height: 128px; padding: 22px; background-position: 56% center; }
-            .reader-brand { font-size: 1.8rem; }
-        }
-        </style>
-        """,
+        f"<style>:root {{ {variables} }}\n{css}</style>",
         unsafe_allow_html=True,
     )
 
@@ -829,45 +523,29 @@ def render_reading_results(
     if included and result_count == 0 and included.issubset(hard_error_tools):
         st.error("本次所选工具均暂时不可用，正文仍可继续阅读。")
 
-    tabs = st.tabs(["字词释义", "典故候选", "出处与化用", "韵部", "词谱 / 平仄"])
-    with tabs[0]:
-        if "char" not in included:
-            st.markdown("<div class='empty-state'>本次未查询</div>", unsafe_allow_html=True)
-        else:
-            render_tool_status("char", errors_by_tool.get("char", []), bool(by_tool["char"]))
-            render_evidences(by_tool["char"])
-    with tabs[1]:
-        if "allusion" not in included:
-            st.markdown("<div class='empty-state'>本次未查询</div>", unsafe_allow_html=True)
-        else:
-            render_tool_status("allusion", errors_by_tool.get("allusion", []), bool(allusions))
-            render_allusions(allusions)
-    with tabs[2]:
-        if "reference" not in included:
-            st.markdown("<div class='empty-state'>本次未查询</div>", unsafe_allow_html=True)
-        else:
+    tab_payloads = {
+        "char": (by_tool["char"], render_evidences),
+        "allusion": (allusions, render_allusions),
+        "reference": (by_tool["reference"], render_evidences),
+        "rhyme": (rhyme_items, render_evidences),
+        "ci_tune": (by_tool["ci_tune"], render_evidences),
+    }
+    tabs = st.tabs([label for _, label in READING_AID_TABS])
+    for tab, (tool_name, _) in zip(tabs, READING_AID_TABS):
+        items, renderer = tab_payloads[tool_name]
+        with tab:
+            if tool_name not in included:
+                st.markdown(
+                    "<div class='empty-state'>本次未查询</div>",
+                    unsafe_allow_html=True,
+                )
+                continue
             render_tool_status(
-                "reference",
-                errors_by_tool.get("reference", []),
-                bool(by_tool["reference"]),
+                tool_name,
+                errors_by_tool.get(tool_name, []),
+                bool(items),
             )
-            render_evidences(by_tool["reference"])
-    with tabs[3]:
-        if "rhyme" not in included:
-            st.markdown("<div class='empty-state'>本次未查询</div>", unsafe_allow_html=True)
-        else:
-            render_tool_status("rhyme", errors_by_tool.get("rhyme", []), bool(rhyme_items))
-            render_evidences(rhyme_items)
-    with tabs[4]:
-        if "ci_tune" not in included:
-            st.markdown("<div class='empty-state'>本次未查询</div>", unsafe_allow_html=True)
-        else:
-            render_tool_status(
-                "ci_tune",
-                errors_by_tool.get("ci_tune", []),
-                bool(by_tool["ci_tune"]),
-            )
-            render_evidences(by_tool["ci_tune"])
+            renderer(items)
 
 
 def render_tools(poem: dict[str, Any]) -> None:

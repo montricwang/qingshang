@@ -33,6 +33,11 @@ HTTP 请求
 ### 2026-06-29 Reader 理解友好型模块整理
 
 - 本轮不新增业务能力，不修改后端 API，不修改数据库结构，不改 poems/sections/lines 数据契约。
+- 根据外部审阅建议完成阶段 1 简化：只整理 `apps/` 前端噪音，不修改后端 API、数据库或 LLM/CNKGraph 服务层。
+- 新增 `apps/assets/reader.css`，将原本内联在 `install_styles()` 中的 Reader CSS 移出 Python 主文件；`install_styles()` 现在只负责注入主题变量并读取 CSS 文件。
+- `apps/reader/config.py` 新增 `READER_CSS` 与 `READING_AID_TABS`，集中保存 CSS 路径和阅读辅助 Tab 配置。
+- `render_reading_results()` 将五段重复 Tab 渲染改为基于 `READING_AID_TABS` 的循环；五个 Tab 的展示行为保持不变。
+- `apps/reader_app.py` 进一步从约 1023 行缩到约 700 行，其中 306 行 CSS 已移动到静态文件。
 - `apps/reader_app.py` 从单文件前端改为“页面入口 + 渲染组合”，保留 Streamlit 页面布局、样式安装、目录、正文和右侧工具展示。
 - 新增 `apps/reader/config.py`：集中保存 Reader 常量、中文标签、主题颜色、阅读模式、超时和证据状态文案。
 - 新增 `apps/reader/api_client.py`：集中保存 Reader 到 FastAPI 的 HTTP 请求；前端仍只调用本地 FastAPI，不直连数据库、LLM 或 CNKGraph。

@@ -12,6 +12,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 HERO_IMAGE = PROJECT_ROOT / "apps/assets/reader-landscape.webp"
+READER_CSS = PROJECT_ROOT / "apps/assets/reader.css"
 DEFAULT_API_BASE_URL = "http://127.0.0.1:8000"
 API_TIMEOUT_SECONDS = 45.0
 REVIEW_TIMEOUT_SECONDS = float(os.getenv("QINGSHANG_REVIEW_TIMEOUT_SECONDS", "180"))
@@ -33,6 +34,13 @@ TOOL_LABELS = {
     "rhyme": "韵部",
     "ci_tune": "词谱 / 平仄",
 }
+READING_AID_TABS = (
+    ("char", "字词释义"),
+    ("allusion", "典故候选"),
+    ("reference", "出处与化用"),
+    ("rhyme", "韵部"),
+    ("ci_tune", "词谱 / 平仄"),
+)
 
 EVIDENCE_SOURCE_LABELS = {
     "cnkgraph_allusion": "CNKGraph 典故候选",
