@@ -206,26 +206,19 @@ def render_slow_mode(poem: dict[str, Any]) -> None:
             )
 
 
-def render_focus_reader(
+def _render_focus_line(
     lines: list[dict[str, Any]],
-    *,
+    current_index: int,
     key_prefix: str,
-    show_playback: bool,
 ) -> None:
-    """突出当前原始词句，并以低透明度提供上下文。"""
-    if not lines:
-        return
-
-    line_count = len(lines)
-    current_index = bounded_line_index(
-        st.session_state.current_line_index,
-        0,
-        line_count,
-    )
-    st.session_state.current_line_index = current_index
+    """以低透明度上下文 + 当前句按钮展示单行聚焦视图。"""
     current_line = lines[current_index]
     previous_text = lines[current_index - 1]["text"] if current_index else ""
-    next_text = lines[current_index + 1]["text"] if current_index + 1 < line_count else ""
+    next_text = (
+        lines[current_index + 1]["text"]
+        if current_index + 1 < len(lines)
+        else ""
+    )
 
     st.markdown(
         f"<div class='focus-context'>{html.escape(previous_text) or '&nbsp;'}</div>",
@@ -244,6 +237,15 @@ def render_focus_reader(
         unsafe_allow_html=True,
     )
 
+
+def _render_focus_controls(
+    *,
+    current_index: int,
+    line_count: int,
+    key_prefix: str,
+    show_playback: bool,
+) -> None:
+    """渲染转轮/领读导航按钮：上一句、播放/暂停/计数、下一句。"""
     previous_column, center_column, next_column = st.columns([1, 1, 1])
     previous_column.button(
         "上一句",
@@ -279,6 +281,33 @@ def render_focus_reader(
             f"<div class='focus-position'>{current_index + 1} / {line_count}</div>",
             unsafe_allow_html=True,
         )
+
+
+def render_focus_reader(
+    lines: list[dict[str, Any]],
+    *,
+    key_prefix: str,
+    show_playback: bool,
+) -> None:
+    """突出当前原始词句，并以低透明度提供上下文。"""
+    if not lines:
+        return
+
+    line_count = len(lines)
+    current_index = bounded_line_index(
+        st.session_state.current_line_index,
+        0,
+        line_count,
+    )
+    st.session_state.current_line_index = current_index
+
+    _render_focus_line(lines, current_index, key_prefix)
+    _render_focus_controls(
+        current_index=current_index,
+        line_count=line_count,
+        key_prefix=key_prefix,
+        show_playback=show_playback,
+    )
 
 
 @st.fragment(run_every=0.5)
@@ -509,6 +538,40 @@ def render_tool_status(tool_name: str, errors: list[str], has_items: bool) -> No
     )
 
 
+def _organize_aids_data(data: dict[str, Any]) -> dict[str, Any]:
+    """把后端 reading-aids 响应按工具分组，并计算错误汇总信息。
+
+    返回字典包含：
+    - by_tool: 按 tool_name 分组的 evidences
+    - rhyme_items: 韵部信息列表
+    - allusions: 典故候选列表
+    - result_count: 总结果数
+    - errors_by_tool: 按工具分组的错误
+    - hard_error_tools: 包含非 404 错误的工具名集合
+    """
+    evidences = data.get("evidences", [])
+    by_tool = {
+        tool_name: [item for item in evidences if item.get("tool_name") == tool_name]
+        for tool_name in ("char", "reference", "ci_tune")
+    }
+    rhyme_items = (data.get("prosody") or {}).get("rhyme_info", [])
+    allusions = data.get("allusions", [])
+    errors_by_tool = _group_tool_errors(data.get("errors", []))
+
+    return {
+        "by_tool": by_tool,
+        "rhyme_items": rhyme_items,
+        "allusions": allusions,
+        "result_count": len(evidences) + len(rhyme_items) + len(allusions),
+        "errors_by_tool": errors_by_tool,
+        "hard_error_tools": {
+            tool_name
+            for tool_name, errors in errors_by_tool.items()
+            if any("HTTP 404" not in error for error in errors)
+        },
+    }
+
+
 def render_reading_results(
     data: dict[str, Any] | None,
     included_tools: list[str] | None,
@@ -518,30 +581,23 @@ def render_reading_results(
         st.markdown("<div class='empty-state'>尚未查询</div>", unsafe_allow_html=True)
         return
 
-    evidences = data.get("evidences", [])
-    by_tool = {
-        tool_name: [item for item in evidences if item.get("tool_name") == tool_name]
-        for tool_name in ("char", "reference", "ci_tune")
-    }
-    rhyme_items = (data.get("prosody") or {}).get("rhyme_info", [])
-    allusions = data.get("allusions", [])
-    errors_by_tool = _group_tool_errors(data.get("errors", []))
+    organized = _organize_aids_data(data)
     included = set(included_tools or TOOL_LABELS)
 
-    result_count = len(evidences) + len(rhyme_items) + len(allusions)
-    hard_error_tools = {
-        tool_name
-        for tool_name, errors in errors_by_tool.items()
-        if any("HTTP 404" not in error for error in errors)
-    }
-    if included and result_count == 0 and included.issubset(hard_error_tools):
+    if (
+        included
+        and organized["result_count"] == 0
+        and included.issubset(organized["hard_error_tools"])
+    ):
         st.error("本次所选工具均暂时不可用，正文仍可继续阅读。")
 
+    by_tool = organized["by_tool"]
+    errors_by_tool = organized["errors_by_tool"]
     tab_payloads = {
         "char": (by_tool["char"], render_evidences),
-        "allusion": (allusions, render_allusions),
+        "allusion": (organized["allusions"], render_allusions),
         "reference": (by_tool["reference"], render_evidences),
-        "rhyme": (rhyme_items, render_evidences),
+        "rhyme": (organized["rhyme_items"], render_evidences),
         "ci_tune": (by_tool["ci_tune"], render_evidences),
     }
     tabs = st.tabs([label for _, label in READING_AID_TABS])

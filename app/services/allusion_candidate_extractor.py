@@ -43,6 +43,35 @@ def _allusion_candidate_system_prompt() -> str:
     )
 
 
+def _allusion_examples() -> str:
+    """返回 prompt 中的正反例文本，说明什么是/不是可查单位。"""
+    return """
+完整可查单位正例：
+- 原句：吟笺赋笔，犹记燕台句。
+  anchor_text：燕台句
+  query_variants：["燕台句", "燕台诗", "李商隐 燕台诗"]
+  禁止输出：燕台
+- 原句：梨花榆火催寒食。
+  候选一 anchor_text：榆火
+  query_variants：["榆火", "榆火 寒食", "清明 赐火"]
+  候选二 anchor_text：寒食
+- 原句：长亭路，年去岁来，应折柔条过千尺。
+  anchor_text：折柔条
+  query_variants：["折柔条", "折柳送别", "折柳"]
+  禁止只输出：柔条
+- 原句：前度刘郎今又来。
+  anchor_text：前度刘郎
+  query_variants：["前度刘郎", "刘禹锡 前度刘郎"]
+  禁止只输出：刘郎
+
+反例：
+- 柳阴直：普通视觉起笔，不作为典故候选。
+- 京华倦客：主题性表达，不作为典故候选。
+- 斜阳冉冉春无极：佳句或评论焦点，不作为典故候选。
+- 沉思前事：情绪收束，不作为典故候选。
+""".strip()
+
+
 def _allusion_candidate_user_prompt(poem: PoemModel) -> str:
     poem_text = build_poem_text_for_prompt(poem)
     return f"""
@@ -95,29 +124,7 @@ candidate_type 只能是：
     像"南都石黛"这样整体更像前代文献语词的短语，应优先考虑 literary_reference，
     不要只因其中含地名就分类为 historical_place。
 
-完整可查单位正例：
-- 原句：吟笺赋笔，犹记燕台句。
-  anchor_text：燕台句
-  query_variants：["燕台句", "燕台诗", "李商隐 燕台诗"]
-  禁止输出：燕台
-- 原句：梨花榆火催寒食。
-  候选一 anchor_text：榆火
-  query_variants：["榆火", "榆火 寒食", "清明 赐火"]
-  候选二 anchor_text：寒食
-- 原句：长亭路，年去岁来，应折柔条过千尺。
-  anchor_text：折柔条
-  query_variants：["折柔条", "折柳送别", "折柳"]
-  禁止只输出：柔条
-- 原句：前度刘郎今又来。
-  anchor_text：前度刘郎
-  query_variants：["前度刘郎", "刘禹锡 前度刘郎"]
-  禁止只输出：刘郎
-
-反例：
-- 柳阴直：普通视觉起笔，不作为典故候选。
-- 京华倦客：主题性表达，不作为典故候选。
-- 斜阳冉冉春无极：佳句或评论焦点，不作为典故候选。
-- 沉思前事：情绪收束，不作为典故候选。
+{_allusion_examples()}
 """.strip()
 
 

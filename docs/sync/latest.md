@@ -30,6 +30,18 @@ HTTP 请求
 当前包含 FastAPI 后端、Reader v0.2.0 Streamlit 前端、数据清洗/导入脚本和单元测试。
 当前没有用户系统、权限系统、Alembic 数据库迁移、Docker 配置或 CI。
 
+### 2026-06-29 函数长度规范化拆分
+
+- 本轮按"AI 协作编码规范 v1"的主函数叙事原则和私有函数抽取原则，对超标函数做拆分；不新增业务能力，不修改数据库结构，不改 poems/sections/lines 数据契约。
+- `app/services/allusion_evidence_reviewer.py` 拆分 `_reviewer_user_prompt()` (61行→55行)：作品标题构建抽出为 `_reviewer_title(poem)`，该函数只返回类似"宋 周邦彦《兰陵王·柳》"的标识字符串。
+- `apps/reader_app.py` 拆分 `render_focus_reader()` (73行→22行)：聚焦视图拆为 `_render_focus_line()`（上下文+当前句渲染）和 `_render_focus_controls()`（导航按钮）。
+- `apps/reader_app.py` 拆分 `render_reading_results()` (51行→36行)：数据整理抽出为 `_organize_aids_data()`，按工具分组、错误汇总和硬错误计算集中在该函数内。
+- `app/services/allusion_candidate_extractor.py` 拆分 `_allusion_candidate_user_prompt()` (76行→52行)：正反例文本抽出为 `_allusion_examples()`。
+- `app/services/allusion_evidence.py` 拆分 `_collect_evidence_result()` (60行→32行)：转化+去重+标注逻辑抽出为 `_normalize_evidence_items()`。
+- `_classify_reviewed_items()` (42行) 和 `_determine_final_status()` (43行) 虽有接近 40 行指导线，但各为单一分类/决策单元，不做拆分。
+- `render_poem_directory()` (58行) 虽接近 60 行硬限，但作为 Streamlit 页面渲染函数，其线性流程从筛选→分页→列表在阅读顺序上更自然，不做拆分。
+- `.venv\Scripts\python.exe -m compileall app apps scripts tests` 已通过；`.venv\Scripts\python.exe -m pytest -q` 已通过 49 项测试。
+
 ### 2026-06-29 AI 协作编码规范可读性整理
 
 - 本轮按照用户提供的“AI 协作编码规范 v1”处理主流程过长、职责混杂和边界防御分散的问题；不新增业务能力，不修改数据库结构，不改 poems/sections/lines 数据契约。

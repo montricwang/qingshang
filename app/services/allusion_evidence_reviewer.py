@@ -59,6 +59,17 @@ def _flatten_reviewable_evidence(
     return records
 
 
+def _reviewer_title(poem: PoemModel) -> str:
+    """构建审阅提示词中使用的作品标识字符串。
+    
+    例如：宋 周邦彦《兰陵王·柳》
+    """
+    base = f"{poem.dynasty} {poem.author}《{poem.tune_name}"
+    if poem.title:
+        base += f"·{poem.title}"
+    return base + "》"
+
+
 def _reviewer_system_prompt() -> str:
     return (
         "你是宋词候选证据审阅器，不是自由赏析者。"
@@ -74,15 +85,10 @@ def _reviewer_user_prompt(
     candidate: AllusionCandidateEvidenceItem,
     evidence: list[dict[str, Any]],
 ) -> str:
-    title_part = f"{poem.dynasty} {poem.author}《{poem.tune_name}"
-    if poem.title:
-        title_part += f"·{poem.title}"
-    title_part += "》"
-
     return f"""
 请审阅下面一个典故/化用候选的已有证据。
 
-当前作品：{title_part}
+当前作品：{_reviewer_title(poem)}
 原句：{candidate.line_text}
 候选锚点：{candidate.anchor_text}
 候选类型：{candidate.candidate_type}

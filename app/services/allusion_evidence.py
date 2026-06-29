@@ -205,6 +205,29 @@ def _annotate_and_sort(
 # 一次查询的执行（典故 or 出处）
 # ---------------------------------------------------------------------------
 
+def _normalize_evidence_items(
+    raw_items: list[EvidenceItem] | list[AllusionCandidate],
+    source: EvidenceSource,
+    seen: set[tuple[str, str, str]],
+    poem: PoemModel,
+    current_line_text: str,
+) -> list[EvidenceItem]:
+    """把 CNKGraph 原始条目转换为去重、标注时间关系并排序后的 EvidenceItem 列表。"""
+    if source == "cnkgraph_allusion":
+        items = [_allusion_as_evidence(item) for item in raw_items]
+    else:
+        items = [_strip_raw(item) for item in raw_items]
+
+    unique_items: list[EvidenceItem] = []
+    for item in items:
+        key = _evidence_key(item)
+        if key not in seen:
+            seen.add(key)
+            unique_items.append(item)
+
+    return _annotate_and_sort(unique_items, poem, current_line_text)
+
+
 async def _collect_evidence_result(
     *,
     source: EvidenceSource,
@@ -231,30 +254,14 @@ async def _collect_evidence_result(
             source=source, query_used=query, status="error", error=str(exc)
         )
 
-    # 典故候选和出处证据统一转为 EvidenceItem 窄字段
-    if source == "cnkgraph_allusion":
-        items = [_allusion_as_evidence(item) for item in raw_items]
-    else:
-        items = [_strip_raw(item) for item in raw_items]
+    unique_items = _normalize_evidence_items(
+        raw_items, source, seen, poem, current_line_text
+    )
 
-    # 去重
-    unique_items: list[EvidenceItem] = []
-    for item in items:
-        key = _evidence_key(item)
-        if key not in seen:
-            seen.add(key)
-            unique_items.append(item)
-
-    # 标记时间关系并排序
-    unique_items = _annotate_and_sort(unique_items, poem, current_line_text)
-
-    hit_count = len(items)
+    hit_count = len(raw_items) if isinstance(raw_items, list) else 0
     displayed = unique_items[:MAX_DISPLAYED_PER_RESULT]
 
-    if hit_count == 0:
-        status = "no_result"
-    else:
-        status = "hit"
+    status = "no_result" if hit_count == 0 else "hit"
 
     return CandidateEvidenceResult(
         source=source,
