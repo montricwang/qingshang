@@ -258,7 +258,7 @@ async def _collect_evidence_result(
         raw_items, source, seen, poem, current_line_text
     )
 
-    hit_count = len(raw_items) if isinstance(raw_items, list) else 0
+    hit_count = len(raw_items)
     displayed = unique_items[:MAX_DISPLAYED_PER_RESULT]
 
     status = "no_result" if hit_count == 0 else "hit"

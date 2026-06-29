@@ -251,13 +251,9 @@ def _classify_reviewed_items(
                 continue
             seen.add(item.evidence_id)
 
-            # 以下角色即使模型放在 best_evidence 也要强制降级或拒绝
-            if item.role in {"current_work_self_hit", "later_reuse", "weak_related", "unknown"}:
-                downgraded.append(item)
-            elif item.role == "irrelevant" or item.relevance == "none":
+            if item.role == "irrelevant" or item.relevance == "none":
                 rejected.append(item)
             elif item.role == "prior_source" and item.relevance in {"strong", "medium"}:
-                # 这才是合格的最佳证据
                 best.append(item)
             else:
                 downgraded.append(item)

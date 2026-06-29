@@ -45,7 +45,17 @@ HTTP 请求
 - 未修改的文件：`app/main.py`（太短）、`app/db/base.py`（7行）、`app/db/session.py`（已有注释）、`app/schemas/poem.py/analysis.py/cnkgraph.py`（字段说明已足够）、`apps/reader/text.py/evidence.py/config.py`（已有区隔或为纯配置）。
 - `.venv\Scripts\python.exe -m compileall app apps scripts tests` 已通过；`.venv\Scripts\python.exe -m pytest -q` 已通过 49 项测试。
 
-### 2026-06-29 函数长度规范化拆分
+### 2026-06-29 Development Principles Skill 不符合项修复
+
+- 本轮按照 Development Principles Skill v1.0 审阅结果，修复四项不符合项；不新增业务能力，不修改数据库结构，不改 poems/sections/lines 数据契约。
+- **硬违反 1：函数长度约束** — `build_poem_reading_aids()` 从 105 行降到 28 行。抽出了 `_find_line_by_no()`（在词作中按行号定位词句）和 `_query_reading_tools()`（按 include 逐一查询外部工具并返回三元组）。主函数现在只保留五步调用骨架。
+- **硬违反 2：防御散布** — `allusion_evidence.py` 的 `isinstance(raw_items, list) else 0` 移除。raw_items 在该分支前已通过 try block 确保为 list，此防御不必要。
+- **软违反 1：函数长度指导线** — `_classify_reviewed_items()` 从 42 行降到 38 行。删除冗余的 if 分支：角色为 current_work_self_hit/later_reuse/weak_related/unknown 的条目在原有 else 分支中已被降级，显式检查是多余的。
+- **软违反 2：函数长度指导线** — `render_poem_directory()` 从 58 行降到约 30 行。筛选与分页计算抽出为 `_filter_directory_poems()`，返回 visible_poems/page_count/page/total_count/opening_lines。
+- 本次修改后 `build_poem_reading_aids()` 28 行、`_collect_evidence_result()` 31 行、`render_focus_reader()` 22 行、`render_reading_results()` 36 行；全项目无超过 60 行的函数。
+- `.venv\Scripts\python.exe -m compileall app apps scripts tests` 已通过；`.venv\Scripts\python.exe -m pytest -q` 已通过 49 项测试。
+
+### 2026-06-29 全项目步骤注释覆盖
 
 - 本轮按"AI 协作编码规范 v1"的主函数叙事原则和私有函数抽取原则，对超标函数做拆分；不新增业务能力，不修改数据库结构，不改 poems/sections/lines 数据契约。
 - `app/services/allusion_evidence_reviewer.py` 拆分 `_reviewer_user_prompt()` (61行→55行)：作品标题构建抽出为 `_reviewer_title(poem)`，该函数只返回类似"宋 周邦彦《兰陵王·柳》"的标识字符串。

@@ -98,6 +98,28 @@ def _poem_label(poem: dict[str, Any]) -> str:
     return f"{tune_name} · {suffix}" if suffix else tune_name
 
 
+def _filter_directory_poems(
+    poems: list[dict[str, Any]], query: str
+) -> tuple[list[dict[str, Any]], int, int, int, dict[str, str]]:
+    """按筛选文本过滤词作并计算分页信息，返回 (visible_poems, page_count, page, total_count, opening_lines)。"""
+    normalized = query.strip().casefold()
+    filtered = [
+        poem
+        for poem in poems
+        if not normalized or normalized in _poem_label(poem).casefold()
+    ]
+    page_count = max(1, (len(filtered) + DIRECTORY_PAGE_SIZE - 1) // DIRECTORY_PAGE_SIZE)
+    st.session_state.directory_page = min(
+        max(st.session_state.directory_page, 0), page_count - 1,
+    )
+    page = st.session_state.directory_page
+    start = page * DIRECTORY_PAGE_SIZE
+    visible_poems = filtered[start : start + DIRECTORY_PAGE_SIZE]
+    untitled_ids = tuple(poem["poem_id"] for poem in visible_poems if not poem.get("title"))
+    opening_lines = fetch_opening_lines(untitled_ids) if untitled_ids else {}
+    return visible_poems, page_count, page, len(filtered), opening_lines
+
+
 def render_poem_directory(poems: list[dict[str, Any]]) -> None:
     """在侧栏展示可筛选的周邦彦词作目录。"""
     st.sidebar.markdown("## 词作目录")
@@ -107,24 +129,9 @@ def render_poem_directory(poems: list[dict[str, Any]]) -> None:
         key="directory_query",
         on_change=reset_directory_page,
     )
-    normalized = query.strip().casefold()
-    filtered = [
-        poem
-        for poem in poems
-        if not normalized or normalized in _poem_label(poem).casefold()
-    ]
-    page_count = max(1, (len(filtered) + DIRECTORY_PAGE_SIZE - 1) // DIRECTORY_PAGE_SIZE)
-    st.session_state.directory_page = min(
-        max(st.session_state.directory_page, 0),
-        page_count - 1,
-    )
-    page = st.session_state.directory_page
-    start = page * DIRECTORY_PAGE_SIZE
-    visible_poems = filtered[start : start + DIRECTORY_PAGE_SIZE]
-    untitled_ids = tuple(poem["poem_id"] for poem in visible_poems if not poem.get("title"))
-    opening_lines = fetch_opening_lines(untitled_ids) if untitled_ids else {}
+    visible_poems, page_count, page, total_count, opening_lines = _filter_directory_poems(poems, query)
 
-    st.sidebar.caption(f"{len(filtered)} 首 · 第 {page + 1}/{page_count} 页")
+    st.sidebar.caption(f"{total_count} 首 · 第 {page + 1}/{page_count} 页")
     previous_column, next_column = st.sidebar.columns(2)
     previous_column.button(
         "上一页",
