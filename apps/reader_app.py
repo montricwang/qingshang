@@ -3,332 +3,61 @@
 from __future__ import annotations
 
 import base64
-import html
-import os
-import re
 import time
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any
 
-import httpx
 import streamlit as st
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-HERO_IMAGE = PROJECT_ROOT / "apps/assets/reader-landscape.webp"
-DEFAULT_API_BASE_URL = "http://127.0.0.1:8000"
-API_TIMEOUT_SECONDS = 45.0
-REVIEW_TIMEOUT_SECONDS = float(os.getenv("QINGSHANG_REVIEW_TIMEOUT_SECONDS", "180"))
-DIRECTORY_PAGE_SIZE = 24
-TRAILING_PAUSE_PATTERN = re.compile(r"[，。！？；、：]+$")
-SOFT_STOPS = {"，", "、"}
-HARD_STOPS = {"。", "！", "？", "；", "："}
-BREATHING_STOPS = SOFT_STOPS | HARD_STOPS
-CLOSING_MARKS = {"”", "’", "」", "』", "》", "）", "】"}
-FULL_WIDTH_INDENT = "　　"
-READING_MODES = ("通读", "慢读", "转轮", "领读")
-SPEED_SECONDS = {"快": 2.5, "中": 4.0, "慢": 6.0}
-
-TOOL_LABELS = {
-    "allusion": "典故候选",
-    "reference": "出处与化用",
-    "char": "字词释义",
-    "rhyme": "韵部",
-    "ci_tune": "词谱 / 平仄",
-}
-
-EVIDENCE_SOURCE_LABELS = {
-    "cnkgraph_allusion": "CNKGraph 典故候选",
-    "cnkgraph_reference": "CNKGraph 出处与化用",
-}
-EVIDENCE_STATUS_LABELS = {
-    "hit": "命中候选证据",
-    "no_result": "无结果",
-    "error": "查询错误",
-}
-OVERALL_STATUS_LABELS = {
-    "hit": "查到候选证据",
-    "no_result": "未查到候选证据",
-    "partial_error": "候选证据部分查询失败",
-    "error": "候选证据查询失败",
-}
-CANDIDATE_TYPE_LABELS = {
-    "allusion": "典故",
-    "literary_reference": "文献化用",
-    "historical_place": "历史地名",
-    "cultural_institution": "礼俗制度",
-    "conventional_motif": "惯用母题",
-    "uncertain": "待查",
-}
-EVIDENCE_CONTEXT_LABELS = {
-    "prior_source": "前代来源候选",
-    "current_poem": "当前作品命中",
-    "later_usage": "后代用例",
-}
-REVIEW_STATUS_LABELS = {
-    "reviewed": "已生成审阅短注",
-    "insufficient_evidence": "证据不足",
-    "ambiguous": "证据有歧义",
-    "error": "审阅失败",
-}
-REVIEW_ROLE_LABELS = {
-    "prior_source": "前代来源",
-    "current_work_self_hit": "当前作品自命中",
-    "later_reuse": "后代沿用",
-    "weak_related": "弱相关",
-    "irrelevant": "无关或误命中",
-    "unknown": "关系不明",
-}
-EVIDENCE_EXCERPT_LIMIT = 160
-
-THEME_PALETTES = {
-    "浅色": {
-        "app_bg": "#f5f4f0",
-        "sidebar_bg": "#e8ebe7",
-        "surface": "#fbfbf8",
-        "surface_muted": "#eeefeb",
-        "text": "#27302c",
-        "text_muted": "#69716c",
-        "border": "#c9cfca",
-        "border_soft": "#dde1dd",
-        "accent": "#85554a",
-        "accent_hover": "#72483f",
-        "accent_soft": "#eaded9",
-        "green": "#526d62",
-        "hero_tint": "#f5f4f0",
-        "hero_blend": "normal",
-    },
-    "深色": {
-        "app_bg": "#1d2421",
-        "sidebar_bg": "#242c28",
-        "surface": "#29312d",
-        "surface_muted": "#313934",
-        "text": "#e7e4dc",
-        "text_muted": "#aab1ac",
-        "border": "#4b5650",
-        "border_soft": "#3a443f",
-        "accent": "#bd8b7e",
-        "accent_hover": "#c99a8d",
-        "accent_soft": "#493a35",
-        "green": "#8ca99d",
-        "hero_tint": "#354039",
-        "hero_blend": "multiply",
-    },
-}
-
-
-class ReaderAPIError(RuntimeError):
-    """表示 Reader 无法从本地 FastAPI 获得有效数据。"""
-
-
-class BreathingFragment(TypedDict):
-    """一段可点击的慢读文本及其原始词句定位。"""
-
-    line_no: int
-    fragment_no: int
-    text: str
-    display_text: str
-    indent_level: int
-    source_line_text: str
-
-
-def _api_url(path: str) -> str:
-    base_url = os.getenv("QINGSHANG_API_BASE_URL", DEFAULT_API_BASE_URL)
-    return f"{base_url.rstrip('/')}{path}"
-
-
-def _response_json(response: httpx.Response) -> Any:
-    try:
-        response.raise_for_status()
-    except httpx.HTTPStatusError as exc:
-        try:
-            detail = response.json().get("detail")
-        except (ValueError, AttributeError):
-            detail = response.text
-        raise ReaderAPIError(detail or f"本地 API 返回 HTTP {response.status_code}") from exc
-
-    try:
-        return response.json()
-    except ValueError as exc:
-        raise ReaderAPIError("本地 API 返回的内容不是有效 JSON") from exc
-
-
-@st.cache_data(ttl=30, show_spinner=False)
-def fetch_poems() -> list[dict[str, Any]]:
-    """读取周邦彦词作目录。"""
-    try:
-        response = httpx.get(
-            _api_url("/api/poems"),
-            params={"author": "周邦彦", "limit": 500},
-            timeout=API_TIMEOUT_SECONDS,
-        )
-    except httpx.RequestError as exc:
-        raise ReaderAPIError("无法连接清商 FastAPI") from exc
-    data = _response_json(response)
-    return data if isinstance(data, list) else []
-
-
-@st.cache_data(ttl=30, show_spinner=False)
-def fetch_poem(poem_id: str) -> dict[str, Any]:
-    """读取一首词的完整结构。"""
-    try:
-        response = httpx.get(
-            _api_url(f"/api/poems/{poem_id}"),
-            timeout=API_TIMEOUT_SECONDS,
-        )
-    except httpx.RequestError as exc:
-        raise ReaderAPIError("无法读取词作详情") from exc
-    data = _response_json(response)
-    return data if isinstance(data, dict) else {}
-
-
-@st.cache_data(ttl=300, show_spinner=False)
-def fetch_opening_lines(poem_ids: tuple[str, ...]) -> dict[str, str]:
-    """并发读取当前目录页无标题词作的起句，不改变列表接口。"""
-
-    def fetch_one(poem_id: str) -> tuple[str, str | None]:
-        try:
-            response = httpx.get(
-                _api_url(f"/api/poems/{poem_id}"),
-                timeout=API_TIMEOUT_SECONDS,
-            )
-            data = _response_json(response)
-        except (httpx.RequestError, ReaderAPIError):
-            return poem_id, None
-
-        sections = data.get("sections", []) if isinstance(data, dict) else []
-        lines = sections[0].get("lines", []) if sections else []
-        opening = lines[0].get("text") if lines else None
-        return poem_id, opening
-
-    with ThreadPoolExecutor(max_workers=6) as executor:
-        results = executor.map(fetch_one, poem_ids)
-    return {poem_id: opening for poem_id, opening in results if opening}
-
-
-def _strip_trailing_pause(text: str) -> str:
-    """只移除起句末尾连续出现的中文停顿标点。"""
-    return TRAILING_PAUSE_PATTERN.sub("", text)
-
-
-def build_breathing_fragments(
-    sections: list[dict[str, Any]],
-) -> list[list[BreathingFragment]]:
-    """按句读拆出慢读分片，并在每个 section 内维护视觉缩进。"""
-    section_fragments: list[list[BreathingFragment]] = []
-
-    for section in sections:
-        indent_level = 0
-        fragments: list[BreathingFragment] = []
-
-        for line in section.get("lines", []):
-            line_no = line["global_line_no"]
-            source_line_text = line["text"]
-            buffer = ""
-            fragment_no = 0
-            pending_stop: str | None = None
-
-            for char_index, char in enumerate(source_line_text):
-                buffer += char
-                next_char = (
-                    source_line_text[char_index + 1]
-                    if char_index + 1 < len(source_line_text)
-                    else None
-                )
-                if char in BREATHING_STOPS:
-                    pending_stop = char
-                is_fragment_end = bool(
-                    pending_stop
-                    and (
-                        char in BREATHING_STOPS
-                        and next_char not in BREATHING_STOPS | CLOSING_MARKS
-                        or char in CLOSING_MARKS
-                        and next_char not in CLOSING_MARKS
-                    )
-                )
-                if not is_fragment_end:
-                    continue
-
-                fragment_no += 1
-                fragments.append(
-                    BreathingFragment(
-                        line_no=line_no,
-                        fragment_no=fragment_no,
-                        text=buffer,
-                        display_text=f"{FULL_WIDTH_INDENT * indent_level}{buffer}",
-                        indent_level=indent_level,
-                        source_line_text=source_line_text,
-                    )
-                )
-                buffer = ""
-                indent_level = indent_level + 1 if pending_stop in SOFT_STOPS else 0
-                pending_stop = None
-
-            if buffer:
-                fragment_no += 1
-                fragments.append(
-                    BreathingFragment(
-                        line_no=line_no,
-                        fragment_no=fragment_no,
-                        text=buffer,
-                        display_text=f"{FULL_WIDTH_INDENT * indent_level}{buffer}",
-                        indent_level=indent_level,
-                        source_line_text=source_line_text,
-                    )
-                )
-
-        section_fragments.append(fragments)
-
-    return section_fragments
-
-
-def flatten_poem_lines(sections: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """按 section 与句序展开原始 poem_line，供转轮和领读定位。"""
-    return [line for section in sections for line in section.get("lines", [])]
-
-
-def bounded_line_index(current: int, delta: int, line_count: int) -> int:
-    """在词作句子范围内移动当前索引。"""
-    if line_count <= 0:
-        return 0
-    return min(max(current + delta, 0), line_count - 1)
-
-
-def fetch_reading_aids(
-    poem_id: str,
-    selected_text: str,
-    line_no: int | None,
-    include: list[str],
-) -> dict[str, Any]:
-    """手动请求当前词作的阅读辅助证据。"""
-    payload = {
-        "selected_text": selected_text,
-        "line_no": line_no,
-        "include": include,
-    }
-    try:
-        response = httpx.post(
-            _api_url(f"/api/poems/{poem_id}/reading-aids"),
-            json=payload,
-            timeout=API_TIMEOUT_SECONDS,
-        )
-    except httpx.RequestError as exc:
-        raise ReaderAPIError("阅读辅助请求失败，正文仍可继续阅读") from exc
-    data = _response_json(response)
-    return data if isinstance(data, dict) else {}
-
-
-def fetch_allusion_candidates(poem_id: str) -> dict[str, Any]:
-    """识别候选、查询 CNKGraph，并请求受控 Evidence Review。"""
-    try:
-        response = httpx.post(
-            _api_url(f"/api/poems/{poem_id}/allusion-candidates/with-review"),
-            timeout=REVIEW_TIMEOUT_SECONDS,
-        )
-    except httpx.RequestError as exc:
-        raise ReaderAPIError("候选证据审阅请求失败，正文仍可继续阅读") from exc
-    data = _response_json(response)
-    return data if isinstance(data, dict) else {}
+from apps.reader.api_client import (
+    ReaderAPIError,
+    fetch_allusion_candidates,
+    fetch_opening_lines,
+    fetch_poem,
+    fetch_poems,
+    fetch_reading_aids,
+)
+from apps.reader.config import (
+    DIRECTORY_PAGE_SIZE,
+    HERO_IMAGE,
+    READING_MODES,
+    REVIEW_STATUS_LABELS,
+    SPEED_SECONDS,
+    THEME_PALETTES,
+    TOOL_LABELS,
+)
+from apps.reader.evidence import (
+    all_candidates_have_no_evidence as _all_candidates_have_no_evidence,
+    candidate_type_label as _candidate_type_label,
+    card_html as _card_html,
+    evidence_count_text as _evidence_count_text,
+    evidence_preview_html as _evidence_preview_html,
+    evidence_status_text as _evidence_status_text,
+    long_evidence_entries as _long_evidence_entries,
+    review_evidence_html as _review_evidence_html,
+    review_result_html as _review_result_html,
+    truncate_evidence_text as _truncate_evidence_text,
+)
+from apps.reader.state import (
+    allusion_candidate_items as _allusion_candidate_items,
+    candidate_selection_payload as _candidate_selection_payload,
+    change_directory_page,
+    change_reading_mode,
+    choose_allusion_candidate,
+    choose_line,
+    choose_poem,
+    initialize_state,
+    maybe_advance_guided_line,
+    move_focus_line,
+    reset_directory_page,
+    reset_guided_clock,
+    toggle_guided_playback,
+)
+from apps.reader.text import (
+    bounded_line_index,
+    build_breathing_fragments,
+    flatten_poem_lines,
+    strip_trailing_pause as _strip_trailing_pause,
+)
 
 
 def install_styles(theme_name: str) -> None:
@@ -674,95 +403,6 @@ def _poem_label(poem: dict[str, Any]) -> str:
     return f"{tune_name} · {suffix}" if suffix else tune_name
 
 
-def choose_poem(poem_id: str) -> None:
-    """切换作品时清空上一首词的选句和证据。"""
-    st.session_state.poem_id = poem_id
-    st.session_state.selected_text = ""
-    st.session_state.selected_line_no = None
-    st.session_state.selected_line_text = None
-    st.session_state.reading_aids = None
-    st.session_state.last_included_tools = None
-    st.session_state.allusion_candidates = None
-    st.session_state.allusion_candidate_error = None
-    st.session_state.pop("allusion_candidate_selection", None)
-    st.session_state.current_line_index = 0
-    st.session_state.is_playing = False
-    st.session_state.last_advance_at = time.monotonic()
-
-
-def choose_line(line_no: int, text: str) -> None:
-    """把点击的词句同步到右侧查询框。"""
-    st.session_state.selected_text = text
-    st.session_state.selected_line_no = line_no
-    st.session_state.selected_line_text = text
-    st.session_state.reading_aids = None
-    st.session_state.last_included_tools = None
-
-
-def _allusion_candidate_items(data: dict[str, Any] | None) -> list[dict[str, Any]]:
-    """兼容新 evidence preview 与旧候选响应的列表字段。"""
-    if not data:
-        return []
-    items = data.get("items", data.get("candidates", []))
-    return items if isinstance(items, list) else []
-
-
-def _candidate_selection_payload(candidate: dict[str, Any]) -> tuple[int, str]:
-    """候选回填只使用原文锚点，不使用任何查询变体。"""
-    return int(candidate["line_no"]), str(candidate["anchor_text"])
-
-
-def choose_allusion_candidate() -> None:
-    """把 AI 候选的原文锚点与行号交给现有手动阅读辅助表单。"""
-    selected = st.session_state.get("allusion_candidate_selection")
-    candidates = _allusion_candidate_items(
-        st.session_state.get("allusion_candidates")
-    )
-    if selected is None:
-        return
-    try:
-        candidate = candidates[int(selected)]
-    except (IndexError, TypeError, ValueError):
-        return
-    choose_line(*_candidate_selection_payload(candidate))
-
-
-def change_reading_mode() -> None:
-    """切换阅读模式时停止自动推进，并从当前索引继续。"""
-    st.session_state.is_playing = False
-    st.session_state.last_advance_at = time.monotonic()
-
-
-def move_focus_line(delta: int, line_count: int) -> None:
-    """手动移动转轮当前句，并重置领读计时。"""
-    st.session_state.current_line_index = bounded_line_index(
-        st.session_state.current_line_index,
-        delta,
-        line_count,
-    )
-    st.session_state.last_advance_at = time.monotonic()
-
-
-def toggle_guided_playback(line_count: int) -> None:
-    """切换领读播放状态；在末句重新播放时回到开头。"""
-    if not st.session_state.is_playing and st.session_state.current_line_index >= line_count - 1:
-        st.session_state.current_line_index = 0
-    st.session_state.is_playing = not st.session_state.is_playing
-    st.session_state.last_advance_at = time.monotonic()
-
-
-def reset_guided_clock() -> None:
-    st.session_state.last_advance_at = time.monotonic()
-
-
-def reset_directory_page() -> None:
-    st.session_state.directory_page = 0
-
-
-def change_directory_page(delta: int) -> None:
-    st.session_state.directory_page += delta
-
-
 def render_poem_directory(poems: list[dict[str, Any]]) -> None:
     """在侧栏展示可筛选的周邦彦词作目录。"""
     st.sidebar.markdown("## 词作目录")
@@ -1016,145 +656,6 @@ def render_poem(poem: dict[str, Any]) -> None:
         st.caption(f"文本来源：{poem['source']}")
 
 
-def _evidence_status_text(status: str, *, overall: bool = False) -> str:
-    """把后端稳定状态转换成不暗示“已确认典故”的界面文案。"""
-    labels = OVERALL_STATUS_LABELS if overall else EVIDENCE_STATUS_LABELS
-    return labels.get(status, "状态未知")
-
-
-def _candidate_type_label(candidate_type: str) -> str:
-    """把稳定枚举转换为 Reader 使用的中文候选类型。"""
-    return CANDIDATE_TYPE_LABELS.get(candidate_type, "待查")
-
-
-def _truncate_evidence_text(
-    text: str | None,
-    limit: int = EVIDENCE_EXCERPT_LIMIT,
-) -> tuple[str, str | None]:
-    """返回默认摘要和可折叠全文；短文本不产生重复全文。"""
-    normalized = (text or "").strip()
-    if len(normalized) <= limit:
-        return normalized, None
-    return normalized[:limit].rstrip() + "…", normalized
-
-
-def _evidence_count_text(result: dict[str, Any]) -> str:
-    """生成不会把“展示 0”误称为截断的命中计数文案。"""
-    hit_count = int(result.get("hit_count") or 0)
-    displayed_count = int(result.get("displayed_count") or 0)
-    if hit_count > 0 and displayed_count == 0:
-        return f"命中 {hit_count} · 暂无可展示条目"
-    text = f"命中 {hit_count} · 展示 {displayed_count}"
-    if displayed_count > 0 and hit_count > displayed_count and result.get("truncated"):
-        text += " · 已截断"
-    return text
-
-
-def _evidence_preview_html(result: dict[str, Any]) -> str:
-    """渲染一个 query/source 的窄证据，所有外部文本先做 HTML 转义。"""
-    source = html.escape(
-        EVIDENCE_SOURCE_LABELS.get(result.get("source"), result.get("source") or "未知来源")
-    )
-    query = html.escape(str(result.get("query_used") or ""))
-    status = html.escape(_evidence_status_text(str(result.get("status") or "")))
-    count_text = html.escape(_evidence_count_text(result))
-    parts = [
-        "<div class='evidence-preview'>",
-        f"<div class='evidence-preview-head'>{source} · {status}</div>",
-        (
-            "<div class='evidence-preview-meta'>"
-            f"查询：{query} · {count_text}</div>"
-        ),
-    ]
-    if result.get("error"):
-        parts.append(
-            "<div class='evidence-preview-error'>"
-            f"{html.escape(str(result['error']))}</div>"
-        )
-    for item in result.get("items", []):
-        title = html.escape(str(item.get("title") or "未命名候选"))
-        excerpt, full_text = _truncate_evidence_text(item.get("evidence_text"))
-        relation = EVIDENCE_CONTEXT_LABELS.get(str(item.get("context_relation") or ""))
-        relation_html = (
-            f"<br><strong>{html.escape(relation)}</strong>" if relation else ""
-        )
-        details = "<br>".join(
-            html.escape(str(value))
-            for value in (
-                item.get("claim"),
-                f"命中片段：{item['anchor_text']}" if item.get("anchor_text") else None,
-                excerpt or None,
-                item.get("source_ref"),
-            )
-            if value
-        )
-        parts.append(
-            "<div class='evidence-preview-item'>"
-            f"<strong>{title}</strong>"
-            f"{relation_html}"
-            f"{'<br>' + details if details else ''}"
-            f"{'<br><em>长引文已折叠</em>' if full_text else ''}</div>"
-        )
-    parts.append("</div>")
-    return "".join(parts)
-
-
-def _long_evidence_entries(result: dict[str, Any]) -> list[tuple[str, str]]:
-    """收集需要由折叠控件展示的长引文。"""
-    entries: list[tuple[str, str]] = []
-    for item in result.get("items", []):
-        _, full_text = _truncate_evidence_text(item.get("evidence_text"))
-        if full_text:
-            entries.append((str(item.get("title") or "未命名候选"), full_text))
-    return entries
-
-
-def _all_candidates_have_no_evidence(candidates: list[dict[str, Any]]) -> bool:
-    """判断是否所有候选都完整查过但没有任何外部命中。"""
-    return bool(candidates) and all(
-        candidate.get("overall_status") == "no_result" for candidate in candidates
-    )
-
-
-def _review_evidence_html(item: dict[str, Any]) -> str:
-    """渲染 Reviewer 对一条实际证据的分类，所有模型文本先转义。"""
-    title = html.escape(str(item.get("title") or "未命名候选"))
-    role = html.escape(
-        REVIEW_ROLE_LABELS.get(str(item.get("role") or ""), "关系不明")
-    )
-    relevance = html.escape(str(item.get("relevance") or "unknown"))
-    reason = html.escape(str(item.get("reason") or "暂无审阅理由"))
-    source_ref = html.escape(str(item.get("source_ref") or ""))
-    query = html.escape(str(item.get("query_used") or ""))
-    return (
-        "<div class='evidence-preview-item'>"
-        f"<strong>{title}</strong><br>"
-        f"{role} · 相关度 {relevance}<br>"
-        f"{reason}<br>"
-        f"查询：{query}"
-        f"{'<br>' + source_ref if source_ref else ''}"
-        "</div>"
-    )
-
-
-def _review_result_html(review: dict[str, Any]) -> str:
-    """生成审阅状态与短注摘要，不把短注表述为最终定论。"""
-    status = html.escape(
-        REVIEW_STATUS_LABELS.get(str(review.get("review_status") or ""), "状态未知")
-    )
-    confidence = html.escape(str(review.get("confidence") or "low"))
-    short_note = html.escape(str(review.get("short_note") or "未生成审阅短注"))
-    caveat = html.escape(str(review.get("caveat") or ""))
-    return (
-        "<div class='evidence-preview'>"
-        f"<div class='evidence-preview-head'>Evidence Review · {status}</div>"
-        f"<div class='evidence-preview-meta'>置信度：{confidence}</div>"
-        f"<div class='evidence-preview-item'><strong>审阅短注</strong><br>{short_note}"
-        f"{'<br><em>' + caveat + '</em>' if caveat else ''}</div>"
-        "</div>"
-    )
-
-
 def render_allusion_evidence_preview(
     poem_id: str,
     candidates: list[dict[str, Any]],
@@ -1238,32 +739,6 @@ def render_allusion_evidence_preview(
                     "<div class='empty-state'>尚无候选证据结果</div>",
                     unsafe_allow_html=True,
                 )
-
-
-def _card_html(
-    *,
-    anchor_text: str | None,
-    title: str | None,
-    body: str | None,
-    detail: str | None,
-    source_ref: str | None,
-    source: str = "cnkgraph",
-) -> str:
-    anchor = html.escape(anchor_text or "当前文本")
-    title_html = html.escape(title or "未命名候选")
-    body_parts = [html.escape(value) for value in (body, detail) if value]
-    body_html = "<br>".join(body_parts) or "暂无摘要"
-    source_text = " · ".join(
-        html.escape(value) for value in (source, source_ref) if value
-    )
-    return (
-        "<div class='evidence-card'>"
-        f"<div class='evidence-anchor'>{anchor}</div>"
-        f"<div class='evidence-title'>{title_html}</div>"
-        f"<div class='evidence-body'>{body_html}</div>"
-        f"<div class='evidence-source'>{source_text}</div>"
-        "</div>"
-    )
 
 
 def render_evidences(items: list[dict[str, Any]]) -> None:
@@ -1499,24 +974,6 @@ def render_tools(poem: dict[str, Any]) -> None:
         "<div class='future-slot'><strong>AI 综合解释</strong><br>下一版本接入</div>",
         unsafe_allow_html=True,
     )
-
-
-def initialize_state(poems: list[dict[str, Any]]) -> None:
-    if "poem_id" not in st.session_state:
-        st.session_state.poem_id = poems[0]["poem_id"] if poems else None
-    st.session_state.setdefault("selected_text", "")
-    st.session_state.setdefault("selected_line_no", None)
-    st.session_state.setdefault("selected_line_text", None)
-    st.session_state.setdefault("reading_aids", None)
-    st.session_state.setdefault("last_included_tools", None)
-    st.session_state.setdefault("allusion_candidates", None)
-    st.session_state.setdefault("allusion_candidate_error", None)
-    st.session_state.setdefault("directory_page", 0)
-    st.session_state.setdefault("reading_mode", "慢读")
-    st.session_state.setdefault("current_line_index", 0)
-    st.session_state.setdefault("is_playing", False)
-    st.session_state.setdefault("speed", "中")
-    st.session_state.setdefault("last_advance_at", time.monotonic())
 
 
 def main() -> None:
