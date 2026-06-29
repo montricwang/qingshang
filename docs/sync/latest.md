@@ -2,7 +2,7 @@
 
 > 更新日期：2026-06-29
 > 仓库基线：`main` / `c5e5160`
-> 当前工作区：Reader 理解友好型模块整理，数据库结构未改动
+> 当前工作区：按 AI 协作编码规范做可读性重构，数据库结构未改动
 
 ## 1. 当前代码现状
 
@@ -29,6 +29,17 @@ HTTP 请求
 
 当前包含 FastAPI 后端、Reader v0.2.0 Streamlit 前端、数据清洗/导入脚本和单元测试。
 当前没有用户系统、权限系统、Alembic 数据库迁移、Docker 配置或 CI。
+
+### 2026-06-29 AI 协作编码规范可读性整理
+
+- 本轮按照用户提供的“AI 协作编码规范 v1”处理主流程过长、职责混杂和边界防御分散的问题；不新增业务能力，不修改数据库结构，不改 poems/sections/lines 数据契约。
+- `app/services/allusion_evidence.py` 将 `build_allusion_evidence_preview()` 拆成主流程与私有步骤：逐 query 查询、逐候选收集、结果排序、局部错误整理、返回项组装。主入口现在更接近“候选识别 -> 证据检索 -> 错误收集 -> 响应组装”的步骤列表。
+- `app/services/allusion_evidence_reviewer.py` 修复 Reviewer 归一化边界：`rejected_evidence` 也必须通过真实 `evidence_id/source/query/title` 校验，不能把 LLM 幻觉出的 rejected 条目带入最终响应。
+- `apps/reader/text.py` 将慢读分片拆成 `_split_line_into_breathing_fragments()`、`_make_breathing_fragment()` 与 `_next_indent_level()`；`build_breathing_fragments()` 只负责按 section/line 组织流程，仍不修改原文、不把展示缩进写入 selected_text。
+- `apps/reader/evidence.py` 将候选证据 HTML 卡片拆成 header、context label、detail、item 四个小函数；HTML 转义仍集中在模板层。
+- `apps/reader_app.py` 将右侧工具区拆成 AI 审阅入口、候选选择、手动 reading-aids 表单与提交处理；页面主流程更适合按“阅读正文 -> 选择文本 -> AI 审阅或手动查询 -> 展示结果”讲解。
+- 新增 `tests/test_allusion_evidence.py::test_reviewer_filters_rejected_items_without_real_evidence_id`，覆盖 LLM rejected evidence 幻觉条目过滤。
+- `.venv\Scripts\python.exe -m compileall app apps scripts tests` 已通过；`.venv\Scripts\python.exe -m pytest -q` 已通过 49 项测试。现有 Starlette `TestClient/httpx` 弃用警告和 `.pytest_cache` 写权限警告不影响结果。
 
 ### 2026-06-29 Reader 理解友好型模块整理
 

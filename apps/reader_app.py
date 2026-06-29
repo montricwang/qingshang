@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import html
 import time
 from typing import Any
 
@@ -359,80 +360,93 @@ def render_allusion_evidence_preview(
         st.info("所有候选均未查到外部候选证据；候选仍可用于手动查询。")
 
     for index, candidate in enumerate(candidates):
-        anchor_text = str(candidate.get("anchor_text") or "未命名候选")
-        review = candidate.get("review_result") or {}
-        if review:
-            overall_label = REVIEW_STATUS_LABELS.get(
-                str(review.get("review_status") or ""),
-                "状态未知",
-            )
-        else:
-            overall_status = str(candidate.get("overall_status") or "")
-            overall_label = _evidence_status_text(overall_status, overall=True)
-        with st.expander(
-            f"{anchor_text} · {overall_label}",
-            expanded=index == 0,
-        ):
-            st.button(
-                anchor_text,
-                key=f"candidate-anchor-{poem_id}-{index}",
-                help="填入下方选中文本",
-                on_click=choose_line,
-                args=_candidate_selection_payload(candidate),
-            )
-            st.caption(
-                f"第 {candidate.get('line_no')} 句 · "
-                f"{_candidate_type_label(str(candidate.get('candidate_type') or ''))} · "
-                f"{candidate.get('confidence')}"
-            )
-            query_variants = candidate.get("query_variants") or []
-            st.caption("查询变体：" + " · ".join(str(value) for value in query_variants))
-            st.caption(str(candidate.get("reason") or ""))
-            results = candidate.get("evidence_results") or []
+        with st.expander(_candidate_expander_title(candidate), expanded=index == 0):
+            _render_candidate_header(poem_id, index, candidate)
+            review = candidate.get("review_result") or {}
             if review:
-                st.markdown(_review_result_html(review), unsafe_allow_html=True)
-                best = review.get("best_evidence") or []
-                if best:
-                    st.caption("最佳候选证据")
-                    for item in best:
-                        st.markdown(
-                            _review_evidence_html(item),
-                            unsafe_allow_html=True,
-                        )
-                secondary = [
-                    *(review.get("downgraded_evidence") or []),
-                    *(review.get("rejected_evidence") or []),
-                ]
-                if secondary:
-                    with st.popover(f"查看降级与拒绝证据 · {len(secondary)}"):
-                        for item in secondary:
-                            st.markdown(
-                                _review_evidence_html(item),
-                                unsafe_allow_html=True,
-                            )
+                _render_review_block(review)
+            _render_raw_evidence_popovers(candidate.get("evidence_results") or [], review)
 
-            if results:
-                with st.popover("查看原候选证据预览"):
-                    for result in results:
-                        st.markdown(
-                            _evidence_preview_html(result),
-                            unsafe_allow_html=True,
-                        )
-                long_entries = [
-                    entry
-                    for result in results
-                    for entry in _long_evidence_entries(result)
-                ]
-                if long_entries:
-                    with st.popover(f"查看候选证据长引文 · {len(long_entries)}"):
-                        for title, full_text in long_entries:
-                            st.caption(title)
-                            st.text(full_text)
-            elif not review:
-                st.markdown(
-                    "<div class='empty-state'>尚无候选证据结果</div>",
-                    unsafe_allow_html=True,
-                )
+
+def _candidate_expander_title(candidate: dict[str, Any]) -> str:
+    """生成候选折叠面板标题，展示 anchor 和当前审阅/查证状态。"""
+    anchor_text = str(candidate.get("anchor_text") or "未命名候选")
+    review = candidate.get("review_result") or {}
+    if review:
+        status = REVIEW_STATUS_LABELS.get(str(review.get("review_status") or ""), "状态未知")
+    else:
+        status = _evidence_status_text(str(candidate.get("overall_status") or ""), overall=True)
+    return f"{anchor_text} · {status}"
+
+
+def _render_candidate_header(poem_id: str, index: int, candidate: dict[str, Any]) -> None:
+    """展示候选锚点、行号、类型、查询变体和谨慎理由。"""
+    anchor_text = str(candidate.get("anchor_text") or "未命名候选")
+    st.button(
+        anchor_text,
+        key=f"candidate-anchor-{poem_id}-{index}",
+        help="填入下方选中文本",
+        on_click=choose_line,
+        args=_candidate_selection_payload(candidate),
+    )
+    st.caption(
+        f"第 {candidate.get('line_no')} 句 · "
+        f"{_candidate_type_label(str(candidate.get('candidate_type') or ''))} · "
+        f"{candidate.get('confidence')}"
+    )
+    query_variants = candidate.get("query_variants") or []
+    st.caption("查询变体：" + " · ".join(str(value) for value in query_variants))
+    st.caption(str(candidate.get("reason") or ""))
+
+
+def _render_review_block(review: dict[str, Any]) -> None:
+    """展示 Review 结论、最佳证据，以及折叠的降级/拒绝证据。"""
+    st.markdown(_review_result_html(review), unsafe_allow_html=True)
+    best = review.get("best_evidence") or []
+    if best:
+        st.caption("最佳候选证据")
+        for item in best:
+            st.markdown(_review_evidence_html(item), unsafe_allow_html=True)
+
+    secondary = [
+        *(review.get("downgraded_evidence") or []),
+        *(review.get("rejected_evidence") or []),
+    ]
+    if not secondary:
+        return
+    with st.popover(f"查看降级与拒绝证据 · {len(secondary)}"):
+        for item in secondary:
+            st.markdown(_review_evidence_html(item), unsafe_allow_html=True)
+
+
+def _render_raw_evidence_popovers(
+    results: list[dict[str, Any]],
+    review: dict[str, Any],
+) -> None:
+    """折叠展示原候选证据预览和长引文；没有结果时显示空态。"""
+    if not results:
+        if not review:
+            st.markdown(
+                "<div class='empty-state'>尚无候选证据结果</div>",
+                unsafe_allow_html=True,
+            )
+        return
+
+    with st.popover("查看原候选证据预览"):
+        for result in results:
+            st.markdown(_evidence_preview_html(result), unsafe_allow_html=True)
+
+    long_entries = [
+        entry
+        for result in results
+        for entry in _long_evidence_entries(result)
+    ]
+    if not long_entries:
+        return
+    with st.popover(f"查看候选证据长引文 · {len(long_entries)}"):
+        for title, full_text in long_entries:
+            st.caption(title)
+            st.text(full_text)
 
 
 def render_evidences(items: list[dict[str, Any]]) -> None:
@@ -551,6 +565,20 @@ def render_reading_results(
 def render_tools(poem: dict[str, Any]) -> None:
     """展示 AI 候选入口、手动工具表单和证据结果。"""
     st.markdown("### 阅读辅助")
+    _render_ai_review_section(poem)
+    _render_manual_aids_form(poem)
+    render_reading_results(
+        st.session_state.get("reading_aids"),
+        st.session_state.get("last_included_tools"),
+    )
+    st.markdown(
+        "<div class='future-slot'><strong>AI 综合解释</strong><br>下一版本接入</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _render_ai_review_section(poem: dict[str, Any]) -> None:
+    """展示 AI 候选证据审阅入口，以及已返回的候选结果。"""
     if st.button(
         "AI 审阅候选证据并生成短注",
         key=f"extract-allusions-{poem['poem_id']}",
@@ -577,24 +605,33 @@ def render_tools(poem: dict[str, Any]) -> None:
             unsafe_allow_html=True,
         )
     elif candidates:
-        candidate_options = [str(index) for index in range(len(candidates))]
-        st.pills(
-            "候选锚点",
-            options=candidate_options,
-            key="allusion_candidate_selection",
-            format_func=lambda index: candidates[int(index)]["anchor_text"],
-            on_change=choose_allusion_candidate,
-        )
-        selected_candidate = st.session_state.get("allusion_candidate_selection")
-        if selected_candidate is not None:
-            candidate = candidates[int(selected_candidate)]
-            st.caption(
-                f"第 {candidate['line_no']} 句 · "
-                f"{_candidate_type_label(str(candidate['candidate_type']))} · "
-                f"{candidate['confidence']}：{candidate['reason']}"
-            )
+        _render_candidate_picker(candidates)
         render_allusion_evidence_preview(poem["poem_id"], candidates)
 
+
+def _render_candidate_picker(candidates: list[dict[str, Any]]) -> None:
+    """展示候选 pills，并把选中的 anchor 回填到手动查询框。"""
+    candidate_options = [str(index) for index in range(len(candidates))]
+    st.pills(
+        "候选锚点",
+        options=candidate_options,
+        key="allusion_candidate_selection",
+        format_func=lambda index: candidates[int(index)]["anchor_text"],
+        on_change=choose_allusion_candidate,
+    )
+    selected_candidate = st.session_state.get("allusion_candidate_selection")
+    if selected_candidate is None:
+        return
+    candidate = candidates[int(selected_candidate)]
+    st.caption(
+        f"第 {candidate['line_no']} 句 · "
+        f"{_candidate_type_label(str(candidate['candidate_type']))} · "
+        f"{candidate['confidence']}：{candidate['reason']}"
+    )
+
+
+def _render_manual_aids_form(poem: dict[str, Any]) -> None:
+    """展示手动 reading-aids 表单，并在提交时查询外部候选证据。"""
     with st.form("reading-aids-form", border=True):
         selected_text = st.text_input(
             "选中文本",
@@ -620,38 +657,40 @@ def render_tools(poem: dict[str, Any]) -> None:
         )
 
     if submitted:
-        normalized_text = selected_text.strip()
-        if not normalized_text:
-            st.warning("请输入或选择文本")
-        elif not selected_labels:
-            st.warning("请至少选择一个工具")
-        else:
-            line_no = (
-                st.session_state.selected_line_no
-                if normalized_text == st.session_state.selected_line_text
-                else None
-            )
-            st.session_state.reading_aids = None
-            st.session_state.last_included_tools = selected_labels
-            try:
-                with st.spinner("正在查询外部候选证据"):
-                    st.session_state.reading_aids = fetch_reading_aids(
-                        poem["poem_id"],
-                        normalized_text,
-                        line_no,
-                        selected_labels,
-                    )
-            except ReaderAPIError as exc:
-                st.error(str(exc))
+        _handle_manual_aids_submission(poem, selected_text, selected_labels)
 
-    render_reading_results(
-        st.session_state.get("reading_aids"),
-        st.session_state.get("last_included_tools"),
+
+def _handle_manual_aids_submission(
+    poem: dict[str, Any],
+    selected_text: str,
+    selected_labels: list[str],
+) -> None:
+    """校验手动查询输入，并调用后端 reading-aids 接口。"""
+    normalized_text = selected_text.strip()
+    if not normalized_text:
+        st.warning("请输入或选择文本")
+        return
+    if not selected_labels:
+        st.warning("请至少选择一个工具")
+        return
+
+    line_no = (
+        st.session_state.selected_line_no
+        if normalized_text == st.session_state.selected_line_text
+        else None
     )
-    st.markdown(
-        "<div class='future-slot'><strong>AI 综合解释</strong><br>下一版本接入</div>",
-        unsafe_allow_html=True,
-    )
+    st.session_state.reading_aids = None
+    st.session_state.last_included_tools = selected_labels
+    try:
+        with st.spinner("正在查询外部候选证据"):
+            st.session_state.reading_aids = fetch_reading_aids(
+                poem["poem_id"],
+                normalized_text,
+                line_no,
+                selected_labels,
+            )
+    except ReaderAPIError as exc:
+        st.error(str(exc))
 
 
 def main() -> None:

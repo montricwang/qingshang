@@ -10,9 +10,10 @@ from app.main import app
 from app.schemas.allusion import AllusionCandidateItem, AllusionCandidateResponse
 from app.schemas.cnkgraph import AllusionCandidate, EvidenceItem
 from app.services.allusion_evidence import (
-    _annotate_and_sort_evidence,
+    _annotate_and_sort,
     _collect_evidence_result,
 )
+from app.services.allusion_evidence_reviewer import normalize_evidence_review
 from app.services.cnkgraph_client import CNKGraphClientError
 
 
@@ -167,7 +168,7 @@ def test_current_poem_hit_is_marked_and_sorted_after_earlier_source() -> None:
         ),
     ]
 
-    result = _annotate_and_sort_evidence(
+    result = _annotate_and_sort(
         items,
         make_poem_context(),  # type: ignore[arg-type]
         "犹记燕台句。",
@@ -203,3 +204,51 @@ def test_truncated_requires_at_least_one_displayed_item() -> None:
     assert (one_hidden.hit_count, one_hidden.displayed_count, one_hidden.truncated) == (1, 0, False)
     assert (nine_hidden.hit_count, nine_hidden.displayed_count, nine_hidden.truncated) == (9, 0, False)
     assert (nine_visible.hit_count, nine_visible.displayed_count, nine_visible.truncated) == (9, 3, True)
+
+
+def test_reviewer_filters_rejected_items_without_real_evidence_id() -> None:
+    evidence = [
+        {
+            "evidence_id": "e1",
+            "source": "cnkgraph_reference",
+            "query_used": "南都石黛",
+            "title": "玉台新咏序",
+            "source_ref": "南朝 徐陵 《玉台新咏序》",
+            "context_relation": "prior_source",
+        }
+    ]
+    payload = {
+        "review_status": "reviewed",
+        "confidence": "high",
+        "short_note": "石黛相关证据可支持谨慎短注。",
+        "best_evidence": [
+            {
+                "evidence_id": "e1",
+                "source": "cnkgraph_reference",
+                "query_used": "南都石黛",
+                "title": "玉台新咏序",
+                "source_ref": "南朝 徐陵 《玉台新咏序》",
+                "role": "prior_source",
+                "relevance": "strong",
+                "reason": "该证据与候选锚点直接相关。",
+            }
+        ],
+        "rejected_evidence": [
+            {
+                "evidence_id": "fake",
+                "source": "cnkgraph_reference",
+                "query_used": "伪造查询",
+                "title": "不存在的证据",
+                "source_ref": "不存在的来源",
+                "role": "irrelevant",
+                "relevance": "none",
+                "reason": "这条记录并不在输入证据中。",
+            }
+        ],
+    }
+
+    review = normalize_evidence_review(payload, evidence)
+
+    assert review.review_status == "reviewed"
+    assert [item.evidence_id for item in review.best_evidence] == ["e1"]
+    assert review.rejected_evidence == []
