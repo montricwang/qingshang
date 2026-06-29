@@ -1,24 +1,26 @@
 """覆盖 Reader 中不依赖浏览器的展示整理逻辑。"""
 
-from apps.reader_app import (
-    _all_candidates_have_no_evidence,
-    _candidate_selection_payload,
-    _candidate_type_label,
-    _card_html,
-    _evidence_preview_html,
-    _evidence_count_text,
-    _evidence_status_text,
-    _group_tool_errors,
-    _long_evidence_entries,
-    _poem_label,
-    _review_evidence_html,
-    _review_result_html,
-    _strip_trailing_pause,
-    _truncate_evidence_text,
+from apps.reader.directory import _poem_label
+from apps.reader.evidence import (
+    all_candidates_have_no_evidence as _all_candidates_have_no_evidence,
+    candidate_type_label as _candidate_type_label,
+    card_html as _card_html,
+    evidence_count_text as _evidence_count_text,
+    evidence_preview_html as _evidence_preview_html,
+    evidence_status_text as _evidence_status_text,
+    long_evidence_entries as _long_evidence_entries,
+    review_evidence_html as _review_evidence_html,
+    review_result_html as _review_result_html,
+    truncate_evidence_text as _truncate_evidence_text,
+)
+from apps.reader.state import candidate_selection_payload as _candidate_selection_payload
+from apps.reader.text import (
+    strip_trailing_pause as _strip_trailing_pause,
     bounded_line_index,
     build_breathing_fragments,
     flatten_poem_lines,
 )
+from apps.reader.tools_panel import _group_tool_errors, _organize_aids_data
 
 
 def test_group_tool_errors_keeps_each_error_in_its_tool() -> None:
@@ -35,6 +37,34 @@ def test_group_tool_errors_keeps_each_error_in_its_tool() -> None:
         "allusion": ["CNKGraph 请求超时"],
         "char": ["CNKGraph 返回 HTTP 404"],
     }
+
+
+def test_organize_aids_data_groups_tools_and_errors() -> None:
+    organized = _organize_aids_data(
+        {
+            "evidences": [
+                {"tool_name": "char", "title": "字词"},
+                {"tool_name": "reference", "title": "出处"},
+                {"tool_name": "ci_tune", "title": "词谱"},
+            ],
+            "prosody": {"rhyme_info": [{"tool_name": "rhyme"}]},
+            "allusions": [{"keyword": "章台"}],
+            "errors": [
+                "char[章]: CNKGraph 返回 HTTP 404",
+                "reference: CNKGraph 请求超时",
+            ],
+        }
+    )
+
+    assert [item["title"] for item in organized["by_tool"]["char"]] == ["字词"]
+    assert [item["title"] for item in organized["by_tool"]["reference"]] == ["出处"]
+    assert [item["title"] for item in organized["by_tool"]["ci_tune"]] == ["词谱"]
+    assert organized["result_count"] == 5
+    assert organized["errors_by_tool"] == {
+        "char": ["CNKGraph 返回 HTTP 404"],
+        "reference": ["CNKGraph 请求超时"],
+    }
+    assert organized["hard_error_tools"] == {"reference"}
 
 
 def test_poem_label_uses_series_label_to_distinguish_repeated_tunes() -> None:

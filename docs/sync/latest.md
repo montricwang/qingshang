@@ -30,6 +30,17 @@ HTTP 请求
 当前包含 FastAPI 后端、Reader v0.2.0 Streamlit 前端、数据清洗/导入脚本和单元测试。
 当前没有用户系统、权限系统、Alembic 数据库迁移、Docker 配置或 CI。
 
+### 2026-06-29 三维审查报告整改
+
+- 本轮根据 Testing & Regression / Readability Cleanup / Data Flow & Contract 三维审查报告做小范围整改；未修改后端、数据库 schema、API 返回结构、poem / section / line 数据契约。
+- 修复 P0：`tests/test_reader_app.py` 不再从装配文件 `apps/reader_app.py` 导入已拆走的内部函数，改为从 `apps.reader.evidence`、`apps.reader.text`、`apps.reader.directory`、`apps.reader.state`、`apps.reader.tools_panel` 导入真实归属模块。
+- 补充 Reader 数据整理测试：新增 `_organize_aids_data()` 分组、计数、局部错误和 hard error 判定测试，覆盖报告指出的 reading-aids 前端整理空白点。
+- 整理 P3：`apps/reader/tools_panel.py` 将 `render_tools()` 主入口及其直接调用的 AI 审阅、候选选择、手动查询表单函数移到文件顶部，低层候选预览、证据渲染和数据整理函数放在后面。
+- 暂未处理 P1 前端 API 响应契约保护：该项需要设计 Reader 端窄 schema 或 fetch 层字段校验，影响面比本轮 P0/P3 更大。
+- 暂未处理 P2 `selected_text / selected_line_no / selected_line_text` 状态合并：该项会触及正文渲染、候选回填和手动查询提交，留待单独小步重构。
+- 已验证：`.venv\Scripts\python.exe -m pytest -q tests\test_reader_app.py` 通过 19 项；`.venv\Scripts\python.exe -m unittest discover -s tests -v` 通过 26 项；`.venv\Scripts\python.exe -m compileall app apps scripts tests` 通过；`.venv\Scripts\python.exe -m pytest -q` 通过 50 项。
+- 未验证：未启动 Streamlit 手动点击 Reader；未连接 PostgreSQL；未真实调用 LLM 或 CNKGraph；未手动验证 `GET /health`、`GET /api/poems`、`GET /api/poems/{poem_id}`、`POST /api/poems/{poem_id}/allusion-candidates/with-review`。
+
 ### 2026-06-29 Reader 装配拆分与入门阅读文档
 
 - 本轮只拆 Streamlit 前端和补阅读文档；未修改后端、数据库 schema、API 返回结构、poem / section / line 数据契约。

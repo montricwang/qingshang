@@ -30,6 +30,137 @@ from apps.reader.state import (
 )
 
 
+def render_tools(poem: dict[str, Any]) -> None:
+    """展示 AI 候选入口、手动工具表单和证据结果。"""
+    st.markdown("### 阅读辅助")
+    _render_ai_review_section(poem)
+    _render_manual_aids_form(poem)
+    render_reading_results(
+        st.session_state.get("reading_aids"),
+        st.session_state.get("last_included_tools"),
+    )
+    st.markdown(
+        "<div class='future-slot'><strong>AI 综合解释</strong><br>下一版本接入</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _render_ai_review_section(poem: dict[str, Any]) -> None:
+    """展示 AI 候选证据审阅入口，以及已返回的候选结果。"""
+    if st.button(
+        "AI 审阅候选证据并生成短注",
+        key=f"extract-allusions-{poem['poem_id']}",
+        use_container_width=True,
+    ):
+        st.session_state.allusion_candidates = None
+        st.session_state.allusion_candidate_error = None
+        st.session_state.pop("allusion_candidate_selection", None)
+        try:
+            with st.spinner("正在识别、查证并逐项审阅候选证据"):
+                st.session_state.allusion_candidates = fetch_allusion_candidates(
+                    poem["poem_id"]
+                )
+        except ReaderAPIError as exc:
+            st.session_state.allusion_candidate_error = str(exc)
+
+    if st.session_state.allusion_candidate_error:
+        st.error(st.session_state.allusion_candidate_error)
+
+    candidates = allusion_candidate_items(st.session_state.allusion_candidates)
+    if st.session_state.allusion_candidates is not None and not candidates:
+        st.markdown(
+            "<div class='empty-state'>本词暂未识别到明确的典故候选</div>",
+            unsafe_allow_html=True,
+        )
+    elif candidates:
+        _render_candidate_picker(candidates)
+        render_allusion_evidence_preview(poem["poem_id"], candidates)
+
+
+def _render_candidate_picker(candidates: list[dict[str, Any]]) -> None:
+    """展示候选 pills，并把选中的 anchor 回填到手动查询框。"""
+    candidate_options = [str(index) for index in range(len(candidates))]
+    st.pills(
+        "候选锚点",
+        options=candidate_options,
+        key="allusion_candidate_selection",
+        format_func=lambda index: candidates[int(index)]["anchor_text"],
+        on_change=choose_allusion_candidate,
+    )
+    selected_candidate = st.session_state.get("allusion_candidate_selection")
+    if selected_candidate is None:
+        return
+    candidate = candidates[int(selected_candidate)]
+    st.caption(
+        f"第 {candidate['line_no']} 句 · "
+        f"{candidate_type_label(str(candidate['candidate_type']))} · "
+        f"{candidate['confidence']}：{candidate['reason']}"
+    )
+
+
+def _render_manual_aids_form(poem: dict[str, Any]) -> None:
+    """展示手动 reading-aids 表单，并在提交时查询外部候选证据。"""
+    with st.form("reading-aids-form", border=True):
+        selected_text = st.text_input(
+            "选中文本",
+            key="selected_text",
+            placeholder="兔葵燕麦",
+        )
+        st.markdown(
+            "<div class='query-hint'>建议输入短语，如：章台、前度刘郎、兔葵燕麦。</div>",
+            unsafe_allow_html=True,
+        )
+        selected_labels = st.pills(
+            "工具",
+            options=list(TOOL_LABELS),
+            selection_mode="multi",
+            default=list(TOOL_LABELS),
+            format_func=lambda key: TOOL_LABELS[key],
+        )
+        selected_labels = list(selected_labels or [])
+        submitted = st.form_submit_button(
+            "查询阅读辅助",
+            type="primary",
+            use_container_width=True,
+        )
+
+    if submitted:
+        _handle_manual_aids_submission(poem, selected_text, selected_labels)
+
+
+def _handle_manual_aids_submission(
+    poem: dict[str, Any],
+    selected_text: str,
+    selected_labels: list[str],
+) -> None:
+    """校验手动查询输入，并调用后端 reading-aids 接口。"""
+    normalized_text = selected_text.strip()
+    if not normalized_text:
+        st.warning("请输入或选择文本")
+        return
+    if not selected_labels:
+        st.warning("请至少选择一个工具")
+        return
+
+    line_no = (
+        st.session_state.selected_line_no
+        if normalized_text == st.session_state.selected_line_text
+        else None
+    )
+    st.session_state.reading_aids = None
+    st.session_state.last_included_tools = selected_labels
+    try:
+        with st.spinner("正在查询外部候选证据"):
+            st.session_state.reading_aids = fetch_reading_aids(
+                poem["poem_id"],
+                normalized_text,
+                line_no,
+                selected_labels,
+            )
+    except ReaderAPIError as exc:
+        st.error(str(exc))
+
+
 def render_allusion_evidence_preview(
     poem_id: str,
     candidates: list[dict[str, Any]],
@@ -255,134 +386,3 @@ def render_reading_results(
                 bool(items),
             )
             renderer(items)
-
-
-def render_tools(poem: dict[str, Any]) -> None:
-    """展示 AI 候选入口、手动工具表单和证据结果。"""
-    st.markdown("### 阅读辅助")
-    _render_ai_review_section(poem)
-    _render_manual_aids_form(poem)
-    render_reading_results(
-        st.session_state.get("reading_aids"),
-        st.session_state.get("last_included_tools"),
-    )
-    st.markdown(
-        "<div class='future-slot'><strong>AI 综合解释</strong><br>下一版本接入</div>",
-        unsafe_allow_html=True,
-    )
-
-
-def _render_ai_review_section(poem: dict[str, Any]) -> None:
-    """展示 AI 候选证据审阅入口，以及已返回的候选结果。"""
-    if st.button(
-        "AI 审阅候选证据并生成短注",
-        key=f"extract-allusions-{poem['poem_id']}",
-        use_container_width=True,
-    ):
-        st.session_state.allusion_candidates = None
-        st.session_state.allusion_candidate_error = None
-        st.session_state.pop("allusion_candidate_selection", None)
-        try:
-            with st.spinner("正在识别、查证并逐项审阅候选证据"):
-                st.session_state.allusion_candidates = fetch_allusion_candidates(
-                    poem["poem_id"]
-                )
-        except ReaderAPIError as exc:
-            st.session_state.allusion_candidate_error = str(exc)
-
-    if st.session_state.allusion_candidate_error:
-        st.error(st.session_state.allusion_candidate_error)
-
-    candidates = allusion_candidate_items(st.session_state.allusion_candidates)
-    if st.session_state.allusion_candidates is not None and not candidates:
-        st.markdown(
-            "<div class='empty-state'>本词暂未识别到明确的典故候选</div>",
-            unsafe_allow_html=True,
-        )
-    elif candidates:
-        _render_candidate_picker(candidates)
-        render_allusion_evidence_preview(poem["poem_id"], candidates)
-
-
-def _render_candidate_picker(candidates: list[dict[str, Any]]) -> None:
-    """展示候选 pills，并把选中的 anchor 回填到手动查询框。"""
-    candidate_options = [str(index) for index in range(len(candidates))]
-    st.pills(
-        "候选锚点",
-        options=candidate_options,
-        key="allusion_candidate_selection",
-        format_func=lambda index: candidates[int(index)]["anchor_text"],
-        on_change=choose_allusion_candidate,
-    )
-    selected_candidate = st.session_state.get("allusion_candidate_selection")
-    if selected_candidate is None:
-        return
-    candidate = candidates[int(selected_candidate)]
-    st.caption(
-        f"第 {candidate['line_no']} 句 · "
-        f"{candidate_type_label(str(candidate['candidate_type']))} · "
-        f"{candidate['confidence']}：{candidate['reason']}"
-    )
-
-
-def _render_manual_aids_form(poem: dict[str, Any]) -> None:
-    """展示手动 reading-aids 表单，并在提交时查询外部候选证据。"""
-    with st.form("reading-aids-form", border=True):
-        selected_text = st.text_input(
-            "选中文本",
-            key="selected_text",
-            placeholder="兔葵燕麦",
-        )
-        st.markdown(
-            "<div class='query-hint'>建议输入短语，如：章台、前度刘郎、兔葵燕麦。</div>",
-            unsafe_allow_html=True,
-        )
-        selected_labels = st.pills(
-            "工具",
-            options=list(TOOL_LABELS),
-            selection_mode="multi",
-            default=list(TOOL_LABELS),
-            format_func=lambda key: TOOL_LABELS[key],
-        )
-        selected_labels = list(selected_labels or [])
-        submitted = st.form_submit_button(
-            "查询阅读辅助",
-            type="primary",
-            use_container_width=True,
-        )
-
-    if submitted:
-        _handle_manual_aids_submission(poem, selected_text, selected_labels)
-
-
-def _handle_manual_aids_submission(
-    poem: dict[str, Any],
-    selected_text: str,
-    selected_labels: list[str],
-) -> None:
-    """校验手动查询输入，并调用后端 reading-aids 接口。"""
-    normalized_text = selected_text.strip()
-    if not normalized_text:
-        st.warning("请输入或选择文本")
-        return
-    if not selected_labels:
-        st.warning("请至少选择一个工具")
-        return
-
-    line_no = (
-        st.session_state.selected_line_no
-        if normalized_text == st.session_state.selected_line_text
-        else None
-    )
-    st.session_state.reading_aids = None
-    st.session_state.last_included_tools = selected_labels
-    try:
-        with st.spinner("正在查询外部候选证据"):
-            st.session_state.reading_aids = fetch_reading_aids(
-                poem["poem_id"],
-                normalized_text,
-                line_no,
-                selected_labels,
-            )
-    except ReaderAPIError as exc:
-        st.error(str(exc))
