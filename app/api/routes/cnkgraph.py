@@ -55,6 +55,10 @@ async def _collect_or_error(
         return fallback
 
 
+# ---------------------------------------------------------------------------
+# 直接工具接口：每个接口对一个 CNKGraph 查询能力
+# ---------------------------------------------------------------------------
+
 @router.get("/api/cnkgraph/char/{char}", response_model=list[EvidenceItem])
 async def read_char_evidence(
     char: str = Path(..., min_length=1, max_length=1),
@@ -107,6 +111,10 @@ async def read_rhyme_evidences(request: RhymeRequest) -> list[EvidenceItem]:
         raise _upstream_http_error(exc) from exc
 
 
+# ---------------------------------------------------------------------------
+# 阅读辅助聚合接口：一次请求聚合多工具结果
+# ---------------------------------------------------------------------------
+
 @router.post(
     "/api/poems/{poem_id}/reading-aids",
     response_model=ReadingAidResponse,
@@ -117,10 +125,12 @@ async def build_poem_reading_aids(
     db: AsyncSession = Depends(get_db),
 ) -> ReadingAidResponse:
     """读取本地词作，并按需聚合可降级的外部阅读证据。"""
+    # 步骤 ① 查询词作
     poem = await get_poem_by_poem_id(db=db, poem_id=poem_id)
     if poem is None:
         raise HTTPException(status_code=404, detail=f"找不到词作：{poem_id}")
 
+    # 步骤 ② 如果传了 line_no，定位到对应词句
     selected_line = None
     if request.line_no is not None:
         selected_line = next(
@@ -138,6 +148,7 @@ async def build_poem_reading_aids(
                 detail=f"词作 {poem_id} 中不存在第 {request.line_no} 句",
             )
 
+    # 步骤 ③ 确定最终要查询的文本
     selected_text = (
         request.selected_text.strip()
         if request.selected_text is not None
@@ -146,6 +157,7 @@ async def build_poem_reading_aids(
     if not selected_text:
         raise HTTPException(status_code=400, detail="selected_text 和 line_no 至少提供一个")
 
+    # 步骤 ④ 按 include 逐一查询外部工具，单个工具失败不中断其余工具
     included = set(request.include)
     evidences: list[EvidenceItem] = []
     allusions: list[AllusionCandidate] = []
@@ -195,6 +207,7 @@ async def build_poem_reading_aids(
             [],
         )
 
+    # 步骤 ⑤ 组装响应
     prosody = None
     if "ci_tune" in included or "rhyme" in included:
         prosody = ProsodyAid(

@@ -31,8 +31,13 @@ EvidenceReviewRole = Literal[
 EvidenceRelevance = Literal["strong", "medium", "weak", "none"]
 
 
+# ============================================================================
+# 候选识别阶段
+# ============================================================================
+
+
 class AllusionCandidateItem(BaseModel):
-    """一个只说明“为何值得查”的疑似典故候选。"""
+    """一个只说明"为何值得查"的疑似典故候选。"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -47,7 +52,12 @@ class AllusionCandidateItem(BaseModel):
 
     @model_validator(mode="after")
     def normalize_query_variants(self) -> "AllusionCandidateItem":
-        """让查询变体有稳定兜底、顺序和数量上限。"""
+        """让查询变体有稳定兜底、顺序和数量上限。
+
+        LLM 可能输出空字符串、重复或超过上限的查询变体，
+        这个校验器在 Pydantic 实例化后自动执行，把变体统一为：
+        anchor_text 优先 → 去重 → 最多 4 个。
+        """
         values = [self.anchor_text, *self.query_variants, self.query]
         normalized: list[str] = []
         for value in values:
@@ -67,6 +77,11 @@ class AllusionCandidateResponse(BaseModel):
 
     poem_id: str
     candidates: list[AllusionCandidateItem] = Field(default_factory=list, max_length=10)
+
+
+# ============================================================================
+# 候选查证阶段
+# ============================================================================
 
 
 class CandidateEvidenceResult(BaseModel):
@@ -99,6 +114,11 @@ class AllusionCandidateEvidenceResponse(BaseModel):
     poem_id: str
     items: list[AllusionCandidateEvidenceItem] = Field(default_factory=list, max_length=10)
     errors: list[str] = Field(default_factory=list)
+
+
+# ============================================================================
+# 候选审阅阶段
+# ============================================================================
 
 
 class EvidenceItemReview(BaseModel):

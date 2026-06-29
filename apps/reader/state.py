@@ -15,6 +15,11 @@ from apps.reader.config import SPEED_SECONDS
 from apps.reader.text import bounded_line_index
 
 
+# ---------------------------------------------------------------------------
+# 词作切换
+# ---------------------------------------------------------------------------
+
+
 def choose_poem(poem_id: str) -> None:
     """切换当前词作，并清空依赖上一首词的阅读状态。"""
     st.session_state.poem_id = poem_id
@@ -30,6 +35,11 @@ def choose_poem(poem_id: str) -> None:
     st.session_state.is_playing = False
 
 
+# ---------------------------------------------------------------------------
+# 文本选择
+# ---------------------------------------------------------------------------
+
+
 def choose_line(line_no: int, text: str) -> None:
     """把正文中点击的句子或候选锚点回填到右侧查询框。"""
     st.session_state.selected_text = text
@@ -37,6 +47,11 @@ def choose_line(line_no: int, text: str) -> None:
     st.session_state.selected_line_text = text
     st.session_state.reading_aids = None
     st.session_state.last_included_tools = None
+
+
+# ---------------------------------------------------------------------------
+# 候选选择与回填
+# ---------------------------------------------------------------------------
 
 
 def allusion_candidate_items(data: dict[str, Any] | None) -> list[dict[str, Any]]:
@@ -65,10 +80,20 @@ def choose_allusion_candidate() -> None:
     choose_line(*candidate_selection_payload(candidate))
 
 
+# ---------------------------------------------------------------------------
+# 阅读模式控制
+# ---------------------------------------------------------------------------
+
+
 def change_reading_mode() -> None:
     """切换阅读模式时停止领读，避免后台自动推进继续运行。"""
     st.session_state.is_playing = False
     st.session_state.last_advance_at = time.monotonic()
+
+
+# ---------------------------------------------------------------------------
+# 领读控制（转轮模式自动推进）
+# ---------------------------------------------------------------------------
 
 
 def move_focus_line(delta: int, line_count: int) -> None:
@@ -117,6 +142,11 @@ def maybe_advance_guided_line(line_count: int) -> None:
     st.session_state.last_advance_at = now
 
 
+# ---------------------------------------------------------------------------
+# 目录翻页
+# ---------------------------------------------------------------------------
+
+
 def reset_directory_page() -> None:
     """目录筛选变化后回到第一页。"""
     st.session_state.directory_page = 0
@@ -125,6 +155,11 @@ def reset_directory_page() -> None:
 def change_directory_page(delta: int) -> None:
     """目录按钮翻页；页面渲染阶段会再次夹住合法范围。"""
     st.session_state.directory_page += delta
+
+
+# ---------------------------------------------------------------------------
+# 页面初始化
+# ---------------------------------------------------------------------------
 
 
 def initialize_state(poems: list[dict[str, Any]]) -> None:

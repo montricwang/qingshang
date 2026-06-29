@@ -12,12 +12,22 @@ from app.core.config import settings
 CNKGraphJSON = dict[str, Any] | list[Any] | str | int | float | bool | None
 
 
+# ============================================================================
+# 统一错误类型
+# ============================================================================
+
+
 class CNKGraphClientError(RuntimeError):
     """统一表示网络、HTTP 状态和 JSON 格式错误。"""
 
     def __init__(self, message: str, status_code: int | None = None) -> None:
         super().__init__(message)
         self.status_code = status_code
+
+
+# ============================================================================
+# 客户端类
+# ============================================================================
 
 
 class CNKGraphClient:
@@ -41,6 +51,8 @@ class CNKGraphClient:
     ) -> CNKGraphJSON:
         """发送一次请求，并把外部失败转换为稳定的客户端异常。"""
         request_kwargs = {"json": json_body} if json_body is not None else {}
+
+        # 步骤 ① 发送 HTTP 请求
         try:
             async with httpx.AsyncClient(
                 base_url=self.base_url,
@@ -48,11 +60,13 @@ class CNKGraphClient:
                 transport=self.transport,
             ) as client:
                 response = await client.request(method, path, **request_kwargs)
+        # 步骤 ② 网络层异常：超时和连接错误独立处理
         except httpx.TimeoutException as exc:
             raise CNKGraphClientError("CNKGraph 请求超时") from exc
         except httpx.RequestError as exc:
             raise CNKGraphClientError("CNKGraph 网络请求失败") from exc
 
+        # 步骤 ③ HTTP 状态码校验：非 2xx 时抛出，保留 status_code 供上游判断 404 降级
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
@@ -61,10 +75,15 @@ class CNKGraphClient:
                 status_code=response.status_code,
             ) from exc
 
+        # 步骤 ④ JSON 格式校验：响应体不是有效 JSON 时抛出
         try:
             return cast(CNKGraphJSON, response.json())
         except ValueError as exc:
             raise CNKGraphClientError("CNKGraph 返回的内容不是有效 JSON") from exc
+
+    # -----------------------------------------------------------------------
+    # CNKGraph 各接口方法：每个方法对应一个只读 API，只做路径拼接和类型收窄
+    # -----------------------------------------------------------------------
 
     async def get_char(self, char: str) -> dict[str, Any]:
         path = f"/api/char/{quote(char, safe='')}"

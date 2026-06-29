@@ -30,6 +30,21 @@ HTTP 请求
 当前包含 FastAPI 后端、Reader v0.2.0 Streamlit 前端、数据清洗/导入脚本和单元测试。
 当前没有用户系统、权限系统、Alembic 数据库迁移、Docker 配置或 CI。
 
+### 2026-06-29 全项目步骤注释覆盖
+
+- 本轮按照 `allusion_evidence_reviewer.py` 和 `allusion_candidate_extractor.py` 中已有的"步骤编号 + 区隔线"注释模式，给项目中缺失这种注释的业务文件打上同类注释。
+- `app/api/routes/poems.py`：五个路由函数全部加上 `# 步骤 ①/②/③`，例如 `analyze_poem_detail()` 的三步（查词作→调LLM→返回）、`read_allusion_candidates_with_review()` 的两步（查词作→构建审阅）。
+- `app/api/routes/cnkgraph.py`：新增 `# --- 直接工具接口 ---` 和 `# --- 阅读辅助聚合接口 ---` 两个区隔，`build_poem_reading_aids()` 加五步注释（查词作→定位行→确定查询文本→逐工具查询→组装响应）。
+- `app/services/poem_analyzer.py`：新增 `# === 提示词构造 ===` 和 `# === 主流程 ===` 区隔，`analyze_poem()` 加五步注释（构造提示词→请求LLM→提取JSON→解析JSON→校验结构）。
+- `app/services/llm_client.py`：新增 `# === LLM 响应数据结构 ===` 和 `# === LLM 调用 ===` 区隔，`chat_completion()` 加六步注释（检查配置→拼URL→构造请求体→发送→校验状态→校验结构）。
+- `app/services/cnkgraph_client.py`：新增 `# === 统一错误类型 ===`、`# === 客户端类 ===` 区隔和各接口方法区隔，`_request_json()` 加四步注释（发送→网络异常→HTTP状态→JSON格式）。
+- `app/db/init_db.py`：`init_db()` 加两步注释（注册模型→建表）。
+- `app/schemas/allusion.py`：新增三个 `# === 候选识别阶段/候选查证阶段/候选审阅阶段 ===` 区隔，`normalize_query_variants()` 校验器 docstring 补充"为什么"说明（LLM可能输出空字符串或重复）。
+- `apps/reader/state.py`：新增六个区隔（词作切换/文本选择/候选选择与回填/阅读模式控制/领读控制/目录翻页/页面初始化）。
+- `apps/reader/api_client.py`：`fetch_opening_lines()` 内联函数 `_first_line()` 加两步注释，外层加并发执行和组装注释。
+- 未修改的文件：`app/main.py`（太短）、`app/db/base.py`（7行）、`app/db/session.py`（已有注释）、`app/schemas/poem.py/analysis.py/cnkgraph.py`（字段说明已足够）、`apps/reader/text.py/evidence.py/config.py`（已有区隔或为纯配置）。
+- `.venv\Scripts\python.exe -m compileall app apps scripts tests` 已通过；`.venv\Scripts\python.exe -m pytest -q` 已通过 49 项测试。
+
 ### 2026-06-29 函数长度规范化拆分
 
 - 本轮按"AI 协作编码规范 v1"的主函数叙事原则和私有函数抽取原则，对超标函数做拆分；不新增业务能力，不修改数据库结构，不改 poems/sections/lines 数据契约。

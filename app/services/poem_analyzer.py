@@ -10,6 +10,11 @@ from app.schemas.analysis import PoemAnalysis
 from app.services.llm_client import chat_completion
 
 
+# ============================================================================
+# 提示词构造
+# ============================================================================
+
+
 def build_poem_text_for_prompt(poem: PoemModel) -> str:
     """把 ORM 中分层保存的片段和词句整理成带编号的提示词文本。"""
     sections = sorted(poem.sections, key=lambda section: section.section_no)
@@ -116,23 +121,32 @@ def build_analysis_prompt(poem: PoemModel) -> list[dict[str, str]]:
     ]
 
 
+# ============================================================================
+# 主流程
+# ============================================================================
+
+
 async def analyze_poem(poem: PoemModel) -> PoemAnalysis:
     """为一首词请求 LLM 赏析，并返回校验后的 PoemAnalysis。"""
+    # 步骤 ① 构造包含完整词结构说明的提示词
     messages = build_analysis_prompt(poem)
 
+    # 步骤 ② 请求 LLM；网络、认证、超时异常由 llm_client 统一处理
     raw_text = await chat_completion(
         messages=messages,
         temperature=0.2,
     )
 
+    # 步骤 ③ 从 LLM 返回文本中提取 JSON（兼容 Markdown 代码围栏）
     json_text = extract_json(raw_text)
 
+    # 步骤 ④ 解析 JSON；不符合 JSON 格式时抛异常，不进入后续校验
     try:
         data = json.loads(json_text)
     except json.JSONDecodeError as exc:
         raise ValueError(f"模型没有返回合法 JSON：{raw_text}") from exc
 
-    # 不符合约定结构的 LLM 输出不会进入 API 响应。
+    # 步骤 ⑤ 用 Pydantic 校验结构；不符合约定结构的 LLM 输出不会进入 API 响应
     analysis = PoemAnalysis.model_validate(data)
 
     return analysis

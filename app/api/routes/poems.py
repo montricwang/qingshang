@@ -39,7 +39,9 @@ async def _get_poem_or_404(db: AsyncSession, poem_id: str) -> PoemModel:
 
     所有需要先查询词作再操作的路由共用一个函数，不再在各路由中重复。
     """
+    # 步骤 ① 查询数据库
     poem = await get_poem_by_poem_id(db=db, poem_id=poem_id)
+    # 步骤 ② 找不到时抛 404，让 FastAPI 返回标准错误响应
     if poem is None:
         raise HTTPException(status_code=404, detail=f"找不到词作：{poem_id}")
     return poem
@@ -77,13 +79,16 @@ async def analyze_poem_detail(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """读取指定诗词并返回 LLM 生成的结构化赏析。"""
+    # 步骤 ① 查询词作，不存在则提前终止
     poem = await _get_poem_or_404(db, poem_id)
 
+    # 步骤 ② 请求 LLM 赏析；外部调用和 JSON 解析阶段的异常统一捕获
     try:
         analysis = await analyze_poem(poem)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"分析失败：{exc}") from exc
 
+    # 步骤 ③ 返回经过 Pydantic 校验的结构化结果
     return analysis.model_dump(mode="json")
 
 
@@ -96,8 +101,10 @@ async def read_allusion_candidates(
     db: AsyncSession = Depends(get_db),
 ) -> AllusionCandidateResponse:
     """读取整首词，让 LLM 识别值得后续查证的典故候选。"""
+    # 步骤 ① 查询词作
     poem = await _get_poem_or_404(db, poem_id)
 
+    # 步骤 ② 调用 LLM 识别候选；解析和过滤阶段的异常统一捕获
     try:
         return await extract_allusion_candidates(poem)
     except Exception as exc:
@@ -113,8 +120,10 @@ async def read_allusion_candidates_with_evidence(
     db: AsyncSession = Depends(get_db),
 ) -> AllusionCandidateEvidenceResponse:
     """识别整首词典故候选，并自动查询 CNKGraph 查证证据。"""
+    # 步骤 ① 查询词作
     poem = await _get_poem_or_404(db, poem_id)
 
+    # 步骤 ② 逐候选查询 CNKGraph 证据；单个查询失败只产生局部错误
     try:
         return await build_allusion_evidence_preview(poem)
     except Exception as exc:
@@ -130,8 +139,10 @@ async def read_allusion_candidates_with_review(
     db: AsyncSession = Depends(get_db),
 ) -> AllusionCandidateReviewResponse:
     """生成候选证据预览，并让受控 Reviewer 逐候选审阅。"""
+    # 步骤 ① 查询词作
     poem = await _get_poem_or_404(db, poem_id)
 
+    # 步骤 ② 构建证据预览 → 逐候选 LLM 审阅；单候选失败不影响其他候选
     try:
         return await build_allusion_evidence_review(poem)
     except Exception as exc:

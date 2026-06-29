@@ -108,17 +108,21 @@ def fetch_opening_lines(poem_ids: tuple[str, ...]) -> dict[str, str]:
     """并发读取当前目录页无标题词作的起句，不改变列表接口（缓存 5 分钟）。"""
 
     def _first_line(poem_id: str) -> tuple[str, str | None]:
+        # 步骤 ① 请求词作详情
         try:
             data = _get_json(f"/api/poems/{poem_id}")
         except (httpx.RequestError, ReaderAPIError):
             return poem_id, None
+        # 步骤 ② 从详情中提取第一句的 text
         sections = data.get("sections", []) if isinstance(data, dict) else []
         lines = sections[0].get("lines", []) if sections else []
         opening = lines[0].get("text") if lines else None
         return poem_id, opening
 
+    # 步骤 ③ 并发执行多个详情请求
     with ThreadPoolExecutor(max_workers=6) as executor:
         results = executor.map(_first_line, poem_ids)
+    # 步骤 ④ 只保留有起句的结果
     return {poem_id: opening for poem_id, opening in results if opening}
 
 

@@ -14,11 +14,12 @@ def register_models() -> None:
 
 async def init_db() -> None:
     """创建尚不存在的数据库表。"""
+    # 步骤 ① 导入 ORM 模型，让 SQLAlchemy 将表声明登记到 Base.metadata
     register_models()
 
     print("Registered tables:", list(Base.metadata.tables.keys()))
 
-    # create_all 只补建缺失表，不会迁移已有表结构。
+    # 步骤 ② 调用 create_all 建表；只补建缺失表，不会迁移已有表结构。
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
